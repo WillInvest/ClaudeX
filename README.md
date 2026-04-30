@@ -1,198 +1,60 @@
-# Superpowers
+# claudex
 
-Superpowers is a complete software development methodology for your coding agents, built on top of a set of composable skills and some initial instructions that make sure your agent uses them.
+Fork of `superpowers/5.0.7` that adds OpenAI Codex as a second-model
+collaborator for brainstorming and as the worker in an
+autonomous-after-brainstorm plan-then-implement pipeline.
 
-## How it works
+## What's different from superpowers
 
-It starts from the moment you fire up your coding agent. As soon as it sees that you're building something, it *doesn't* just jump into trying to write code. Instead, it steps back and asks you what you're really trying to do. 
+Three modified files and one new skill directory; everything else is
+upstream verbatim. Modified files are bracketed with
+`<!-- CLAUDEX:BEGIN -->` and `<!-- CLAUDEX:END -->` markers so future
+merges from upstream are mechanical.
 
-Once it's teased a spec out of the conversation, it shows it to you in chunks short enough to actually read and digest. 
+- `skills/brainstorming/SKILL.md` — three insertions:
+  1. At each multi-choice / "I recommend X" question, Claude dispatches
+     Codex via `codex exec` and shows a side-by-side
+     counter-recommendation (≤60 words).
+  2. After the design converges and before the spec is written, Codex
+     gets one shot at the full transcript + design and returns a
+     `READY | FIX | WRONG-DIRECTION` verdict (≤200 words).
+  3. The upstream "user reviews spec" gate is removed; brainstorming
+     hands off directly to `claudex-build` instead of `writing-plans`.
+- `commands/brainstorm.md` — deprecation stub points at the claudex
+  brainstorming skill instead of the superpowers one.
+- `package.json` — name changed to `claudex`, version `0.1.0`.
 
-After you've signed off on the design, your agent puts together an implementation plan that's clear enough for an enthusiastic junior engineer with poor taste, no judgement, no project context, and an aversion to testing to follow. It emphasizes true red/green TDD, YAGNI (You Aren't Gonna Need It), and DRY. 
+## What's new
 
-Next up, once you say "go", it launches a *subagent-driven-development* process, having agents work through each engineering task, inspecting and reviewing their work, and continuing forward. It's not uncommon for Claude to be able to work autonomously for a couple hours at a time without deviating from the plan you put together.
+- `skills/claudex-build/` — autonomous plan→impl skill. Codex (latest
+  model) writes plan and implementation; a fresh Opus 4.7 subagent
+  reviews each with DRIFT (vs source artifact) + QUALITY (against three
+  criteria: Minimal, Consistent, Verifiable). Loop on verdict, max 2
+  review rounds per stage. Audit trail at `/tmp/claudex/<run-id>/`.
+- `commands/claudex-build.md` — slash command `/claudex-build`.
 
-There's a bunch more to it, but that's the core of the system. And because the skills trigger automatically, you don't need to do anything special. Your coding agent just has Superpowers.
+## Install
 
-
-## Sponsorship
-
-If Superpowers has helped you do stuff that makes money and you are so inclined, I'd greatly appreciate it if you'd consider [sponsoring my opensource work](https://github.com/sponsors/obra).
-
-Thanks! 
-
-- Jesse
-
-
-## Installation
-
-**Note:** Installation differs by platform. 
-
-### Claude Code Official Marketplace
-
-Superpowers is available via the [official Claude plugin marketplace](https://claude.com/plugins/superpowers)
-
-Install the plugin from Anthropic's official marketplace:
-
-```bash
-/plugin install superpowers@claude-plugins-official
-```
-
-### Claude Code (Superpowers Marketplace)
-
-The Superpowers marketplace provides Superpowers and some other related plugins for Claude Code.
-
-In Claude Code, register the marketplace first:
+This plugin lives at `~/.claude/plugins/claudex/`. Discovery is via
+symlinks to `~/.claude/skills/` and `~/.claude/commands/`. To install,
+run:
 
 ```bash
-/plugin marketplace add obra/superpowers-marketplace
+ln -s ~/.claude/plugins/claudex/skills/brainstorming   ~/.claude/skills/claudex-brainstorming
+ln -s ~/.claude/plugins/claudex/skills/claudex-build   ~/.claude/skills/claudex-build
+ln -s ~/.claude/plugins/claudex/commands/brainstorm.md ~/.claude/commands/claudex-brainstorm.md
+ln -s ~/.claude/plugins/claudex/commands/claudex-build.md ~/.claude/commands/claudex-build.md
 ```
 
-Then install the plugin from this marketplace:
+Coexists with the upstream `superpowers` plugin — both can be installed
+at the same time. The prefixed names (`claudex-...`) prevent collision.
 
-```bash
-/plugin install superpowers@superpowers-marketplace
-```
+## Requirements
 
-### OpenAI Codex CLI
+- `codex` CLI ≥ `0.122.0` (for `codex exec resume`).
+- Claude Code with the `Agent` tool and `model: "opus"` resolution.
 
-- Open plugin search interface
+## Source of truth
 
-```bash
-/plugins
-```
-
-Search for Superpowers
-
-```bash
-superpowers
-```
-
-Select `Install Plugin`
-
-### OpenAI Codex App
-
-- In the Codex app, click on Plugins in the sidebar.
-- You should see `Superpowers` in the Coding section. 
-- Click the `+` next to Superpowers and follow the prompts.
-
-
-### Cursor (via Plugin Marketplace)
-
-In Cursor Agent chat, install from marketplace:
-
-```text
-/add-plugin superpowers
-```
-
-or search for "superpowers" in the plugin marketplace.
-
-### OpenCode
-
-Tell OpenCode:
-
-```
-Fetch and follow instructions from https://raw.githubusercontent.com/obra/superpowers/refs/heads/main/.opencode/INSTALL.md
-```
-
-**Detailed docs:** [docs/README.opencode.md](docs/README.opencode.md)
-
-### GitHub Copilot CLI
-
-```bash
-copilot plugin marketplace add obra/superpowers-marketplace
-copilot plugin install superpowers@superpowers-marketplace
-```
-
-### Gemini CLI
-
-```bash
-gemini extensions install https://github.com/obra/superpowers
-```
-
-To update:
-
-```bash
-gemini extensions update superpowers
-```
-
-## The Basic Workflow
-
-1. **brainstorming** - Activates before writing code. Refines rough ideas through questions, explores alternatives, presents design in sections for validation. Saves design document.
-
-2. **using-git-worktrees** - Activates after design approval. Creates isolated workspace on new branch, runs project setup, verifies clean test baseline.
-
-3. **writing-plans** - Activates with approved design. Breaks work into bite-sized tasks (2-5 minutes each). Every task has exact file paths, complete code, verification steps.
-
-4. **subagent-driven-development** or **executing-plans** - Activates with plan. Dispatches fresh subagent per task with two-stage review (spec compliance, then code quality), or executes in batches with human checkpoints.
-
-5. **test-driven-development** - Activates during implementation. Enforces RED-GREEN-REFACTOR: write failing test, watch it fail, write minimal code, watch it pass, commit. Deletes code written before tests.
-
-6. **requesting-code-review** - Activates between tasks. Reviews against plan, reports issues by severity. Critical issues block progress.
-
-7. **finishing-a-development-branch** - Activates when tasks complete. Verifies tests, presents options (merge/PR/keep/discard), cleans up worktree.
-
-**The agent checks for relevant skills before any task.** Mandatory workflows, not suggestions.
-
-## What's Inside
-
-### Skills Library
-
-**Testing**
-- **test-driven-development** - RED-GREEN-REFACTOR cycle (includes testing anti-patterns reference)
-
-**Debugging**
-- **systematic-debugging** - 4-phase root cause process (includes root-cause-tracing, defense-in-depth, condition-based-waiting techniques)
-- **verification-before-completion** - Ensure it's actually fixed
-
-**Collaboration** 
-- **brainstorming** - Socratic design refinement
-- **writing-plans** - Detailed implementation plans
-- **executing-plans** - Batch execution with checkpoints
-- **dispatching-parallel-agents** - Concurrent subagent workflows
-- **requesting-code-review** - Pre-review checklist
-- **receiving-code-review** - Responding to feedback
-- **using-git-worktrees** - Parallel development branches
-- **finishing-a-development-branch** - Merge/PR decision workflow
-- **subagent-driven-development** - Fast iteration with two-stage review (spec compliance, then code quality)
-
-**Meta**
-- **writing-skills** - Create new skills following best practices (includes testing methodology)
-- **using-superpowers** - Introduction to the skills system
-
-## Philosophy
-
-- **Test-Driven Development** - Write tests first, always
-- **Systematic over ad-hoc** - Process over guessing
-- **Complexity reduction** - Simplicity as primary goal
-- **Evidence over claims** - Verify before declaring success
-
-Read [the original release announcement](https://blog.fsck.com/2025/10/09/superpowers/).
-
-## Contributing
-
-The general contribution process for Superpowers is below. Keep in mind that we don't generally accept contributions of new skills and that any updates to skills must work across all of the coding agents we support.
-
-1. Fork the repository
-2. Switch to the 'dev' branch
-3. Create a branch for your work
-4. Follow the `writing-skills` skill for creating and testing new and modified skills
-5. Submit a PR, being sure to fill in the pull request template.
-
-See `skills/writing-skills/SKILL.md` for the complete guide.
-
-## Updating
-
-Superpowers updates are somewhat coding-agent dependent, but are often automatic.
-
-## License
-
-MIT License - see LICENSE file for details
-
-## Community
-
-Superpowers is built by [Jesse Vincent](https://blog.fsck.com) and the rest of the folks at [Prime Radiant](https://primeradiant.com).
-
-- **Discord**: [Join us](https://discord.gg/35wsABTejz) for community support, questions, and sharing what you're building with Superpowers
-- **Issues**: https://github.com/obra/superpowers/issues
-- **Release announcements**: [Sign up](https://primeradiant.com/superpowers/) to get notified about new versions
+- Spec: `~/vault/projects/claudex/specs/2026-04-30-claudex-plugin-design.md`
+- Implementation plan: `~/vault/projects/claudex/plans/2026-04-30-claudex-plugin-impl.md`
