@@ -139,6 +139,51 @@ If `codex` is not installed or the call fails, fall back to the upstream behavio
 - Cover: architecture, components, data flow, error handling, testing
 - Be ready to go back and clarify if something doesn't make sense
 
+<!-- CLAUDEX:BEGIN — final-design Codex verdict -->
+
+**Codex final-design verdict (one round only):**
+
+Once the user has approved the converged design and BEFORE you write the spec doc, dispatch Codex once with the full transcript + the agreed design. Use this prompt:
+
+```bash
+codex exec \
+  --sandbox read-only \
+  --skip-git-repo-check \
+  - <<'EOF'
+You are reviewing the final design from a brainstorm. Another model
+(Claude) and the user converged on the design below.
+
+# Brainstorm transcript
+<paste full transcript here>
+
+# The agreed design
+<paste design summary as presented to user>
+
+Independent review. Output exactly one of:
+- READY: <one line — design is sound, proceed to spec>
+- FIX: <bulleted list, ≤5 items — concrete issues to address>
+- WRONG-DIRECTION: <one line — fundamental rethink needed>
+
+≤ 200 words total. No preamble.
+EOF
+```
+
+Present the verdict to the user verbatim:
+
+```
+[Codex final-design verdict]:
+<Codex's response>
+```
+
+Then, based on the verdict:
+- **READY**: announce "Codex agrees, proceeding to spec." Move to "Write design doc."
+- **FIX**: ask the user "Which of these should we incorporate?" Apply the user-chosen items to the design. **Do NOT re-dispatch Codex** — one round only. Then move to "Write design doc."
+- **WRONG-DIRECTION**: ask the user whether to re-brainstorm from scratch or override Codex and proceed. Honor the user's choice.
+
+If `codex` is not installed or the call fails, skip the verdict and proceed straight to "Write design doc," noting the failure to the user in one short line.
+
+<!-- CLAUDEX:END -->
+
 **Design for isolation and clarity:**
 
 - Break the system into smaller units that each have one clear purpose, communicate through well-defined interfaces, and can be understood and tested independently
