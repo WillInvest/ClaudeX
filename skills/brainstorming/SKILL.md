@@ -29,7 +29,7 @@ You MUST create a task for each of these items and complete them in order:
 6. **Write design doc** — save to `docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md` and commit
 7. **Spec self-review** — quick inline check for placeholders, contradictions, ambiguity, scope (see below)
 8. **User reviews written spec** — ask user to review the spec file before proceeding
-9. **Transition to implementation** — invoke writing-plans skill to create implementation plan
+9. **Transition to implementation** — invoke claudex-build skill to run the autonomous plan→impl pipeline
 
 ## Process Flow
 
@@ -45,7 +45,7 @@ digraph brainstorming {
     "Write design doc" [shape=box];
     "Spec self-review\n(fix inline)" [shape=box];
     "User reviews spec?" [shape=diamond];
-    "Invoke writing-plans skill" [shape=doublecircle];
+    "Invoke claudex-build skill" [shape=doublecircle];
 
     "Explore project context" -> "Visual questions ahead?";
     "Visual questions ahead?" -> "Offer Visual Companion\n(own message, no other content)" [label="yes"];
@@ -59,11 +59,11 @@ digraph brainstorming {
     "Write design doc" -> "Spec self-review\n(fix inline)";
     "Spec self-review\n(fix inline)" -> "User reviews spec?";
     "User reviews spec?" -> "Write design doc" [label="changes requested"];
-    "User reviews spec?" -> "Invoke writing-plans skill" [label="approved"];
+    "User reviews spec?" -> "Invoke claudex-build skill" [label="approved"];
 }
 ```
 
-**The terminal state is invoking writing-plans.** Do NOT invoke frontend-design, mcp-builder, or any other implementation skill. The ONLY skill you invoke after brainstorming is writing-plans.
+**The terminal state is invoking claudex-build.** Do NOT invoke writing-plans, frontend-design, mcp-builder, or any other implementation skill. The ONLY skill you invoke after brainstorming is claudex-build.
 
 ## The Process
 
@@ -216,17 +216,21 @@ After writing the spec document, look at it with fresh eyes:
 
 Fix any issues inline. No need to re-review — just fix and move on.
 
-**User Review Gate:**
-After the spec review loop passes, ask the user to review the written spec before proceeding:
+<!-- CLAUDEX:BEGIN — replaces upstream user-review gate + writing-plans handoff -->
 
-> "Spec written and committed to `<path>`. Please review it and let me know if you want to make any changes before we start writing out the implementation plan."
+**Handoff to claudex-build (no user-review gate):**
 
-Wait for the user's response. If they request changes, make them and re-run the spec review loop. Only proceed once the user approves.
+After the spec self-review pass, do NOT ask the user to review the spec. Instead:
 
-**Implementation:**
+1. Announce: `Spec at <path>. Starting claudex-build.`
+2. Invoke the `claudex-build` skill (via the Skill tool, name: `claudex-build`).
+3. Do NOT invoke `writing-plans`.
 
-- Invoke the writing-plans skill to create a detailed implementation plan
-- Do NOT invoke any other skill. writing-plans is the next step.
+The drift between brainstorm intent and spec/plan/impl is audited by the Opus reviewer at each downstream stage of `claudex-build`, so the user does not need to read the spec.
+
+If the user explicitly asks to review the spec before proceeding (e.g., "wait, let me read it"), honor that — show the spec path and pause until the user says go. The default is to proceed without pausing.
+
+<!-- CLAUDEX:END -->
 
 ## Key Principles
 
