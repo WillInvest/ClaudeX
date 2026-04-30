@@ -77,6 +77,54 @@ digraph brainstorming {
 - Only one question per message - if a topic needs more exploration, break it into multiple questions
 - Focus on understanding: purpose, constraints, success criteria
 
+<!-- CLAUDEX:BEGIN — dual-model dispatch at recommendation moments -->
+
+**Codex second opinion at every recommendation moment:**
+
+Whenever you are about to ask the user a question that (a) offers multiple choices (A/B/C, "pick X or Y") OR (b) carries a recommendation ("I recommend X", "My lean: A", "I'd go with B"), you MUST dispatch Codex first via Bash and present both opinions side by side.
+
+Dispatch via:
+
+```bash
+codex exec \
+  --sandbox read-only \
+  --skip-git-repo-check \
+  - <<'EOF'
+You are reviewing a brainstorm in progress. Another model (Claude) is
+about to ask the user a question.
+
+# Brainstorm transcript so far
+<paste transcript here>
+
+# The question Claude drafted
+<paste question here>
+
+# Claude's recommendation
+<paste recommendation + brief reasoning here>
+
+Independently consider this question. Output exactly one of:
+A) AGREE: <one line — same recommendation, may add a confirming reason>
+B) DISAGREE: <one line — your recommendation + why it's better>
+C) ANGLE-MISSED: <one line — a question Claude isn't asking but should>
+
+≤ 60 words total. No preamble.
+EOF
+```
+
+Then present to the user in this exact shape:
+
+```
+[Claude's question + recommendation]
+
+[Codex second opinion]: <Codex's one-liner>
+
+Your call.
+```
+
+If `codex` is not installed or the call fails, fall back to the upstream behavior (ask the question without a Codex second opinion) and note the failure to the user in one short line. Do not block the brainstorm.
+
+<!-- CLAUDEX:END -->
+
 **Exploring approaches:**
 
 - Propose 2-3 different approaches with trade-offs
