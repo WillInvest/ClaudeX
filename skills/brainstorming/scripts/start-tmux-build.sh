@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # Launches /claudex:build for SPEC_PATH inside a detached tmux session.
 # Prints the session name and operating instructions to stdout.
-# Usage: start-tmux-build.sh <spec-path>
+# Usage: start-tmux-build.sh <spec-path> [run-id]
 set -euo pipefail
 
-SPEC_PATH="${1:?usage: start-tmux-build.sh <spec-path>}"
+SPEC_PATH="${1:?usage: start-tmux-build.sh <spec-path> [run-id]}"
+INHERITED_RUN_ID="${2:-}"
 [[ -f "$SPEC_PATH" ]] || { echo "error: spec not found: $SPEC_PATH" >&2; exit 1; }
 command -v tmux >/dev/null || { echo "error: tmux not on PATH" >&2; exit 1; }
 command -v claude >/dev/null || { echo "error: claude CLI not on PATH" >&2; exit 1; }
@@ -17,7 +18,11 @@ slug="$(echo "$spec_base" \
   | sed -E 's/-design$//')"
 
 # Compute run-id and tmux session name.
-RUN_ID="$(date -u +%Y-%m-%d-%H%M)-${slug}"
+if [[ -n "$INHERITED_RUN_ID" ]]; then
+  RUN_ID="$INHERITED_RUN_ID"
+else
+  RUN_ID="$(date -u +%Y-%m-%d-%H%M)-${slug}"
+fi
 HMS="$(date +%H%M%S)"
 SESSION_NAME="claudex-build-${slug}-${HMS}"
 
