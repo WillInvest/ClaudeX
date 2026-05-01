@@ -233,19 +233,34 @@ After writing the spec document, look at it with fresh eyes:
 
 Fix any issues inline. No need to re-review — just fix and move on.
 
-<!-- CLAUDEX:BEGIN — replaces upstream user-review gate + writing-plans handoff -->
+<!-- CLAUDEX:BEGIN — replaces upstream user-review gate with inline-vs-detached build handoff -->
 
-**Handoff to build (no user-review gate):**
+**Handoff to build (inline or detached tmux):**
 
-After the spec self-review pass, do NOT ask the user to review the spec. Instead:
+After the spec self-review pass, do NOT ask the user to review the spec. Decide the execution path:
 
-1. Announce: `Spec at <path>. Starting build.`
-2. Invoke the `build` skill (via the Skill tool, name: `build`).
-3. Do NOT invoke `writing-plans`.
+1. Probe `command -v tmux >/dev/null`.
+   - **Missing**: announce `tmux not found — running build inline. Install tmux for detached builds that survive SSH drops.` Then invoke the `build` skill (Skill tool, name: `build`) and stop. Do not invoke `writing-plans`.
+   - **Present**: ask the user:
+     ```
+     Spec at <path>. How should I run the build?
+       1) Inline (this session — dies if SSH drops)
+       2) Detached tmux (survives SSH drops; you attach with `tmux attach -t <name>`)
+     ```
+
+2. **Inline (1)**: announce `Spec at <path>. Starting build inline.` Invoke the `build` skill. Same as the prior behavior.
+
+3. **Detached tmux (2)**: invoke the launcher script via Bash. The launcher lives at `scripts/start-tmux-build.sh` next to this `SKILL.md`, matching the bare-relative convention used by the neighboring brainstorming scripts such as `visual-companion.md`. From this skill's directory, invoke it as `bash scripts/start-tmux-build.sh "<spec-path>"`.
+   ```bash
+   bash scripts/start-tmux-build.sh "<spec-path>"
+   ```
+   Echo the script's stdout verbatim to the user. Do NOT invoke the `build` skill in this session — the detached tmux owns the build now.
 
 The drift between brainstorm intent and spec/plan/impl is audited by the Opus reviewer at each downstream stage of `build`, so the user does not need to read the spec.
 
-If the user explicitly asks to review the spec before proceeding (e.g., "wait, let me read it"), honor that — show the spec path and pause until the user says go. The default is to proceed without pausing.
+If the user explicitly asks to review the spec before proceeding, honor that — show the spec path and pause until the user says go. The default is to proceed without pausing.
+
+**Optional personal extension (not in core, not shipped):** if `~/.claude/claudex/post-build-hook.md` exists and is non-empty, the launcher appends its contents to the in-tmux prompt after `/claudex:build <spec-path>`. Use this for personal post-build behaviors (note capture, notifications, etc.) without modifying claudex. An empty file is treated as no hook.
 
 <!-- CLAUDEX:END -->
 
