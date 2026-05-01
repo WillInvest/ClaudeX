@@ -141,7 +141,7 @@ final summary in main session, pointer to audit trail
 Identify the spec path (provided by the brainstorming handoff or by the user). Compute `<run-id>` as `YYYY-MM-DD-HHMM-<slug>` where `<slug>` is a short kebab-case summary of the goal.
 
 ```bash
-RUN_ID="$(date -u +%Y-%m-%d-%H%M)-<slug>"
+RUN_ID="${RUN_ID:-$(date -u +%Y-%m-%d-%H%M)-<slug>}"
 mkdir -p /tmp/claudex/$RUN_ID
 cp <spec-path> /tmp/claudex/$RUN_ID/00-spec.md
 ```
