@@ -127,15 +127,30 @@ When a decision is made, append it to `/tmp/claudex/${RUN_ID}/03-decisions.md` i
 - Source: user, Claude recommendation, Codex recommendation, or both
 - `Picked-over:` whenever the user rejects either model's recommendation
 
-Whenever you are about to ask a question that offers multiple choices or carries a recommendation, draft the question internally — DO NOT show it to the user yet — then dispatch `second-opinion-prompt.md`. Only after Codex's verdict returns, present the question to the user as a single message in this shape:
+Whenever you are about to ask a question that offers multiple choices or carries a recommendation:
 
-```
-[your question + options + your recommendation]
+1. Draft the question internally — **do NOT show it to the user yet**.
+2. Write the question text to `/tmp/claudex/${RUN_ID}/.q.md` and your recommendation text to `/tmp/claudex/${RUN_ID}/.r.md` (these are scratch files, overwritten each turn).
+3. Run the dispatch script:
 
-[Codex second opinion]: <verdict line>
+   ```bash
+   bash skills/brainstorming/scripts/dispatch-codex-2nd-opinion.sh \
+     "/tmp/claudex/${RUN_ID}" \
+     "/tmp/claudex/${RUN_ID}/.q.md" \
+     "/tmp/claudex/${RUN_ID}/.r.md"
+   ```
 
-Your call.
-```
+   The script returns one verdict line (`AGREE: ...`, `DISAGREE: ...`, or `ANGLE-MISSED: ...`) on stdout. Exit 3 means codex CLI is missing — fall back to an `Agent` dispatch with the same prompt template (`second-opinion-prompt.md`) and label the verdict `[Codex(fallback) 2nd opinion]:`. Exit 4/5 means runtime failure — fall back the same way for that one call only.
+
+4. **Only after the verdict is in hand**, present the question to the user as a single message in this shape:
+
+   ```
+   [your question + options + your recommendation]
+
+   [Codex second opinion]: <verdict line>
+
+   Your call.
+   ```
 
 The question must be shown to the user exactly once, with Codex's verdict already embedded. Never announce "Dispatching Codex" with the drafted question visible — that is the duplication anti-pattern. Do not treat agreement between models as user approval.
 
@@ -177,11 +192,19 @@ If the user redirects mid-dialogue, append the redirect to `02-transcript.md`, u
 
 ## 10. Stage 5: Spec write + Opus review
 
-**Bright-line rule for the orchestrator at this stage:** you NEVER use the `Write` tool to author spec body content. Every byte of the spec body comes from `codex exec` output. Your only allowed file actions at Stage 5 are: (a) writing the prompt files in `/tmp/claudex/${RUN_ID}/`; (b) running `cp` / shell redirection to clean Codex output and copy it to the canonical spec path; (c) writing the Opus reviewer's response file. If you find yourself drafting Markdown spec sections in your own response and using `Write`, stop. The contract is the contract.
+**Bright-line rule for the orchestrator at this stage:** you NEVER use the `Write` tool to author spec body content. Every byte of the spec body comes from a `codex exec` dispatch — and the `## Decisions preamble` is byte-spliced from `03-decisions.md` by the dispatch script (Codex is told to leave that section empty). Your only allowed file actions at Stage 5 are: (a) running `dispatch-codex-spec-write.sh`; (b) running `build-opus-spec-review-prompt.sh`; (c) writing the Opus reviewer's response file (after `Agent` returns). If you find yourself drafting Markdown spec sections in your own response and using `Write`, stop. The contract is the contract.
 
-Freeze `/tmp/claudex/${RUN_ID}/03-decisions.md` when Stage 4 approval is complete. From this point, do not edit it. Codex-only spec edits are allowed; Claude does not write or patch the spec body except to mechanically strip Codex wrapper text during cleanup (a `sed`/`awk` shell pass, not Markdown authoring).
+Freeze `/tmp/claudex/${RUN_ID}/03-decisions.md` when Stage 4 approval is complete. From this point, do not edit it.
 
-Codex writes the spec using `spec-codex-prompt.md` with `{{TRANSCRIPT}}`, `{{DECISIONS}}`, `{{APPROACHES}}`, and `{{DESIGN}}`. The spec body structure is:
+The orchestrator dispatches Codex via the script `scripts/dispatch-codex-spec-write.sh`. The script:
+- builds the round prompt from `spec-codex-prompt.md` (filling `{{TRANSCRIPT}}` / `{{DECISIONS}}` / `{{APPROACHES}}` / `{{DESIGN}}`),
+- runs `codex exec` (round 1) or `codex exec resume --last` (round 2 + fix dispatches),
+- strips Codex wrapper noise (banner, prompt-echo, `tokens used` footer),
+- byte-splices the verbatim `03-decisions.md` content into `## Decisions preamble`,
+- copies the cleaned spec to the canonical path,
+- exits non-zero on `WRONG-DIRECTION` (3), codex failure (4), cleanup failure (5), or post-splice byte-mismatch (6 — should not happen, defensive).
+
+Required spec body structure (Codex emits 9 of 10 sections; `## Decisions preamble` is empty in Codex's output and the script splices it):
 
 ```
 # <topic> — design
@@ -196,35 +219,29 @@ Codex writes the spec using `spec-codex-prompt.md` with `{{TRANSCRIPT}}`, `{{DEC
 ## Out of scope
 ```
 
-The `## Decisions preamble` content must byte-match frozen `03-decisions.md`. A mismatch is DRIFT.
+The `## Decisions preamble` content byte-matches `03-decisions.md` **by construction** (script-spliced, not Codex-copied). A post-splice mismatch is a script bug, not a DRIFT finding.
 
-Canonical loop (concrete bash + Agent dispatches; pseudocode below as a roadmap):
+Canonical loop (every dispatch runs through scripts; pseudocode below as a roadmap):
 
 ```bash
-# Build the round-1 prompt by filling spec-codex-prompt.md slots, write to:
-#   /tmp/claudex/${RUN_ID}/spec-prompt-r1.md
+RUN_DIR="/tmp/claudex/${RUN_ID}"
+APPROACHES="${RUN_DIR}/05-approaches.md"
+DESIGN="${RUN_DIR}/.design.md"          # write the approved design summary here
 
-# Round 1 — Codex writes the spec.
-codex exec \
-  --sandbox read-only \
-  --skip-git-repo-check \
-  -C "/tmp/claudex/${RUN_ID}" \
-  - < "/tmp/claudex/${RUN_ID}/spec-prompt-r1.md" \
-  > "/tmp/claudex/${RUN_ID}/06-spec-r1.md" \
-  2>&1
+# Round 1 — Codex writes the spec; script splices preamble; cp's to canonical.
+bash skills/brainstorming/scripts/dispatch-codex-spec-write.sh \
+  "$RUN_DIR" 1 "$DESIGN" "$APPROACHES" "$CANONICAL_SPEC_PATH"
 
-# Strip Codex wrapper noise (e.g. session banner, "tokens used" footer) — shell only.
-sed -n '/^# /,$p' "/tmp/claudex/${RUN_ID}/06-spec-r1.md" \
-  | sed '/^tokens used/,$d' \
-  > "/tmp/claudex/${RUN_ID}/06-spec-r1.clean.md"
-
-# Copy to canonical spec path (overwrite each round; do NOT use the Write tool).
-cp "/tmp/claudex/${RUN_ID}/06-spec-r1.clean.md" "${CANONICAL_SPEC_PATH}"
+# Build the Opus reviewer prompt deterministically.
+REVIEW_PROMPT="$(bash skills/brainstorming/scripts/build-opus-spec-review-prompt.sh \
+  "$RUN_DIR" 1 "$APPROACHES")"
 ```
 
-Then dispatch the Opus reviewer with the `Agent` tool (`subagent_type: "general-purpose"`, `model: "opus"`), using `spec-reviewer-prompt.md` filled with `{{TRANSCRIPT}} {{DECISIONS}} {{APPROACHES}} {{SPEC}}`. Save the reviewer's reply to `/tmp/claudex/${RUN_ID}/07-spec-r1-review.md`.
+Then dispatch the Opus reviewer with the `Agent` tool (`subagent_type: "general-purpose"`, `model: "opus"`, `description: "Review codex spec for DRIFT and QUALITY"`), passing the entire contents of `$REVIEW_PROMPT` as `prompt`. Save the reviewer's reply to `/tmp/claudex/${RUN_ID}/07-spec-r1-review.md`.
 
-If `codex` is `MISSING` or fails at runtime, dispatch the same prompt via `Agent` (`model: "sonnet"`); the subagent's reply IS the round's spec output. Strip wrapper noise the same way and `cp` to canonical. Never substitute `Write` for `cp` here — the rule is about the *source* of the bytes, and `cp` makes that auditable.
+For round 2, fix1, or fix2, pass that round name as the second arg to `dispatch-codex-spec-write.sh` (it switches output filenames and uses `codex exec resume --last`). For `fix-and-proceed`, do NOT re-build a review prompt — the verdict pre-approved the fix.
+
+If `dispatch-codex-spec-write.sh` exits 4 (codex CLI missing or runtime failure), fall back to dispatching the same `spec-codex-prompt.md` via `Agent` (`model: "sonnet"`); take the subagent's reply, write it to `06-spec-r1.md`, then run the cleanup + splice manually with the same Python heredocs the script uses (or re-run the script with a stub `codex` on PATH). Never substitute `Write` for the splice — the rule is about the *source* of the bytes.
 
 Roadmap (read with the bash above):
 
