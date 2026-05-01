@@ -2,6 +2,20 @@
 
 **Multi-model collaboration on top of [superpowers](https://github.com/obra/superpowers) — the official Claude Code plugin for harness flow.** ClaudeX adds Codex into the flow so Claude and Codex — two state-of-the-art models — cooperate inside the same loop. Codex gives a second opinion at every recommendation in brainstorming, then writes plan and implementation while Opus reviews — so drift gets caught even when no human reads the spec.
 
+> **v0.2.0 breaking changes.** If you installed v0.1.x, the marketplace name and one slash-command renamed. Migrate with:
+>
+> ```
+> /plugin uninstall claudex
+> /plugin marketplace remove claudex-marketplace
+> /plugin marketplace add WillInvest/ClaudeX
+> /plugin install claudex@willinvest
+> ```
+>
+> The renamed surface:
+> - marketplace: `claudex-marketplace` → `willinvest`
+> - command: `/claudex:claudex-build` → `/claudex:build`
+> - The brainstorming skill is unchanged — auto-activates from natural-language intent, or invoke via `/claudex:brainstorming` in the picker.
+
 ---
 
 ## Why ClaudeX
@@ -35,7 +49,7 @@ sequenceDiagram
     Note over C,X: design converges
     C->>X: dispatch (final verdict)
     X-->>C: READY / FIX / WRONG-DIRECTION
-    Note over C: hand off → /claudex-build
+    Note over C: hand off → /claudex:build
 
     rect rgba(60,120,255,0.08)
         Note over C,O: PLAN stage
@@ -80,7 +94,7 @@ In Claude Code:
 
 ```
 /plugin marketplace add WillInvest/ClaudeX
-/plugin install claudex@claudex-marketplace
+/plugin install claudex@willinvest
 ```
 
 Then verify the [`codex` CLI](https://github.com/openai/codex) is available (>= 0.122.0):
@@ -89,13 +103,22 @@ Then verify the [`codex` CLI](https://github.com/openai/codex) is available (>= 
 codex --version
 ```
 
-Then in Claude Code:
+If `codex` is not installed, ClaudeX falls back to a Claude subagent for Codex's role — dual-vendor diversity is degraded but independent-context review is preserved.
+
+Then in Claude Code, just describe what you want to build in natural language and the brainstorming skill auto-activates, or invoke it via the picker:
 
 ```
-/claudex:brainstorm  let's add a --verbose flag to my CLI tool
+/claudex:brainstorming  let's add a --verbose flag to my CLI tool
 ```
 
-ClaudeX takes it from there: Claude + Codex co-brainstorm → spec → autonomous plan → autonomous impl → final summary, with terse 3-line status updates per stage and a full audit trail you can read after.
+ClaudeX takes it from there: Claude + Codex co-brainstorm → spec → autonomous plan → autonomous impl → final summary, with terse 3-line status updates per stage and a full audit trail you can read after. The build pipeline is reachable directly via `/claudex:build`.
+
+To update later:
+
+```
+/plugin marketplace update willinvest
+/plugin update claudex
+```
 
 <details>
 <summary>Manual install (fallback, pre-marketplace)</summary>
@@ -104,17 +127,16 @@ ClaudeX takes it from there: Claude + Codex co-brainstorm → spec → autonomou
 # 1. Clone alongside any existing superpowers install (no collision)
 git clone https://github.com/WillInvest/ClaudeX.git ~/.claude/plugins/claudex
 
-# 2. Symlink the skills + commands into the user-local Claude Code path
-ln -s ~/.claude/plugins/claudex/skills/brainstorming      ~/.claude/skills/claudex-brainstorming
-ln -s ~/.claude/plugins/claudex/skills/claudex-build      ~/.claude/skills/claudex-build
-ln -s ~/.claude/plugins/claudex/commands/brainstorm.md    ~/.claude/commands/claudex-brainstorm.md
-ln -s ~/.claude/plugins/claudex/commands/claudex-build.md ~/.claude/commands/claudex-build.md
+# 2. Symlink the skills + command into the user-local Claude Code path
+ln -s ~/.claude/plugins/claudex/skills/brainstorming  ~/.claude/skills/claudex-brainstorming
+ln -s ~/.claude/plugins/claudex/skills/build          ~/.claude/skills/claudex-build
+ln -s ~/.claude/plugins/claudex/commands/build.md     ~/.claude/commands/claudex-build.md
 
-# 3. Verify codex CLI is available
+# 3. Verify codex CLI is available (optional — claudex falls back to a Claude subagent if missing)
 codex --version  # need >= 0.122.0
 ```
 
-With manual install the slash commands are `/claudex-brainstorm` and `/claudex-build` (no namespace prefix).
+The brainstorming skill auto-activates from natural-language intent; with manual install you can also invoke `/claudex-build` (no namespace prefix) directly.
 
 </details>
 

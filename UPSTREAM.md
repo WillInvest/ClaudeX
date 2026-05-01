@@ -33,7 +33,7 @@ Upstream governance/history that points at obra is also dropped:
 - `assets/superpowers-small.svg`
 
 Upstream test harness — not run in ClaudeX, no CI here; smoke testing
-happens via `claudex-build` audit trails at `/tmp/claudex/<run-id>/`:
+happens via `build` audit trails at `/tmp/claudex/<run-id>/`:
 
 - `tests/` (entire directory: `claude-code/`, `explicit-skill-requests/`,
   `skill-triggering/`, `subagent-driven-dev/`, plus the already-dropped
@@ -49,12 +49,15 @@ wrapped in `<!-- CLAUDEX:BEGIN -->` / `<!-- CLAUDEX:END -->` markers):
   (upstream uses the polyglot `run-hook.cmd` wrapper)
 - `.gitattributes` — no `*.cmd` rule
 - `.version-bump.json` — only the three Claude Code manifests
-- `skills/brainstorming/SKILL.md` — three insertion blocks
-- `commands/brainstorm.md` — single insertion block (deprecation-stub redirect)
+- `skills/brainstorming/SKILL.md` — codex-availability probe + three insertion blocks
+- `commands/brainstorm.md` — deleted in v0.1.2 (deprecation stub removed; brainstorming skill auto-triggers or is invoked via the picker)
+- `commands/write-plan.md`, `commands/execute-plan.md` — deleted in v0.1.3 (deprecation stubs removed; build skill replaces both)
+- `skills/writing-plans/`, `skills/executing-plans/` — deleted in v0.1.3 (subsumed by `skills/build/`)
 - New, no upstream counterpart:
   - `README.md`, `UPSTREAM.md`
-  - `skills/claudex-build/` (entire directory)
-  - `commands/claudex-build.md`
+  - `skills/build/` (entire directory; renamed from `skills/claudex-build/` in v0.2.0)
+  - `commands/build.md` (renamed from `commands/claudex-build.md` in v0.2.0)
+  - `.github/workflows/release.yml` (added in v0.1.1)
 
 ## Merge procedure
 
