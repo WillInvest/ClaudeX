@@ -1,6 +1,6 @@
 ---
 name: claudex-build
-description: Autonomous plan→implement pipeline invoked after a brainstorm has produced a spec. Codex (latest model, via `codex exec`) writes the plan and the implementation; a fresh Opus 4.7 subagent reviews each artifact for DRIFT (faithfulness to source) and QUALITY (Minimal / Consistent / Verifiable); orchestrator (main Claude) decides convergence per the canonical loop. Replaces the upstream `superpowers:writing-plans → superpowers:executing-plans` chain. Use after the claudex-brainstorming skill has produced a spec; user typically invokes via `/claudex-build` or by being handed off from claudex-brainstorming. Skips per-stage user gates by design — escalates only on hard blockers. Audit trail at `/tmp/claudex/<run-id>/`.
+description: Autonomous plan→implement pipeline invoked after a brainstorm has produced a spec. Codex (latest model, via `codex exec`) writes the plan and the implementation; a fresh Opus 4.7 subagent reviews each artifact for DRIFT (faithfulness to source) and QUALITY (Minimal / Consistent / Verifiable); orchestrator (main Claude) decides convergence per the canonical loop. Use after the claudex-brainstorming skill has produced a spec; user typically invokes via `/claudex-build` or by being handed off from claudex-brainstorming. Skips per-stage user gates by design — escalates only on hard blockers. Audit trail at `/tmp/claudex/<run-id>/`.
 ---
 
 # claudex-build — autonomous plan→impl pipeline
@@ -23,7 +23,7 @@ The skill is wrong when:
 
 - It's a one-line fix or trivial edit — just do it directly.
 - The spec is unclear or still being shaped — finish brainstorming first.
-- The work is pure exploration or debugging — use `superpowers:systematic-debugging`.
+- The work is pure exploration or debugging — handle it conversationally; this skill is for already-specified plan→impl work.
 
 ## Codex availability probe (run first)
 
@@ -336,6 +336,6 @@ The user can read any of these to audit your judgment after the fact. The `99-fi
 ## What this skill is NOT
 
 - A spec-writer — the spec already exists when this skill runs.
-- A code-review skill for arbitrary diffs — use `superpowers:requesting-code-review` or `code-review:code-review`.
-- A debugging tool — use `superpowers:systematic-debugging`.
+- A code-review skill for arbitrary diffs — review happens inline at each round here; for ad-hoc reviews use whatever review skill your harness provides.
+- A debugging tool — use a debugging workflow (root-cause → minimal repro → fix); this skill assumes the spec is already correct.
 - A way for the orchestrator to write code while saying "Codex did it." If you find yourself drafting plan content or writing implementation diffs in the main session, stop. The contract is the contract.

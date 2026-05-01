@@ -68,10 +68,9 @@ PRs containing multiple unrelated changes will be closed. Split them into separa
 
 Skills are not prose — they are code that shapes agent behavior. If you modify skill content:
 
-- Use `superpowers:writing-skills` to develop and test changes
-- Run adversarial pressure testing across multiple sessions
+- Develop and pressure-test changes against multiple sessions before submitting
 - Show before/after eval results in your PR
-- Do not modify carefully-tuned content (Red Flags tables, rationalization lists, "human partner" language) without evidence the change is an improvement
+- Do not modify carefully-tuned content (rationalization lists, hard-gate language) without evidence the change is an improvement
 
 ## Understand the Project Before Contributing
 
