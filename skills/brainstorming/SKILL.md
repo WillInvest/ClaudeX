@@ -7,6 +7,23 @@ description: "You MUST use this before any creative work - creating features, bu
 
 Help turn ideas into fully formed designs and specs through natural collaborative dialogue.
 
+<!-- CLAUDEX:BEGIN — codex availability probe at skill entry -->
+
+**ONCE per skill invocation, before the first Codex dispatch**, probe codex availability via Bash:
+
+```bash
+command -v codex >/dev/null && echo CODEX_READY || echo CODEX_MISSING
+```
+
+- If `CODEX_READY`: use the `codex exec ...` dispatches in the blocks below as written.
+- If `CODEX_MISSING`: notify the user ONCE with this exact line (no preamble, no other text):
+
+> Codex CLI not detected — a Claude subagent will play Codex's role for this brainstorm. Dual-vendor diversity is degraded; independent-context review is preserved. Install codex (`npm install -g @openai/codex`) for the full dual-model behavior.
+
+Then in EVERY codex dispatch block below, dispatch the equivalent prompt via the `Agent` tool with `subagent_type: "general-purpose"`, `model: "sonnet"`, and the full prompt body (everything between `<<'EOF'` and `EOF`) passed as `prompt`. The subagent's reply is treated as Codex's reply for that step. The output format requirements (one of A/B/C, READY/FIX/WRONG-DIRECTION, ≤word counts) still apply.
+
+<!-- CLAUDEX:END -->
+
 Start by understanding the current project context, then ask questions one at a time to refine the idea. Once you understand what you're building, present the design and get user approval.
 
 <HARD-GATE>
@@ -121,7 +138,7 @@ Then present to the user in this exact shape:
 Your call.
 ```
 
-If `codex` is not installed or the call fails, fall back to the upstream behavior (ask the question without a Codex second opinion) and note the failure to the user in one short line. Do not block the brainstorm.
+If `CODEX_MISSING` from the entry probe, dispatch the same prompt via `Agent` tool (`subagent_type: "general-purpose"`, `model: "sonnet"`) instead of `codex exec`; the subagent's reply substitutes for Codex's. If the codex call itself fails at runtime (auth/network), do the same Agent fallback inline and note the failure to the user in one short line. Do not block the brainstorm.
 
 <!-- CLAUDEX:END -->
 
@@ -180,7 +197,7 @@ Then, based on the verdict:
 - **FIX**: ask the user "Which of these should we incorporate?" Apply the user-chosen items to the design. **Do NOT re-dispatch Codex** — one round only. Then move to "Write design doc."
 - **WRONG-DIRECTION**: ask the user whether to re-brainstorm from scratch or override Codex and proceed. Honor the user's choice.
 
-If `codex` is not installed or the call fails, skip the verdict and proceed straight to "Write design doc," noting the failure to the user in one short line.
+If `CODEX_MISSING` from the entry probe, dispatch the same prompt via `Agent` tool (`subagent_type: "general-purpose"`, `model: "sonnet"`) instead of `codex exec`; the subagent's reply substitutes for Codex's verdict (still one round only). If the codex call fails at runtime, do the same Agent fallback inline and note the failure to the user in one short line.
 
 <!-- CLAUDEX:END -->
 

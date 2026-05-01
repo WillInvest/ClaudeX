@@ -25,9 +25,26 @@ The skill is wrong when:
 - The spec is unclear or still being shaped — finish brainstorming first.
 - The work is pure exploration or debugging — use `superpowers:systematic-debugging`.
 
+## Codex availability probe (run first)
+
+**Before any dispatch**, probe codex availability ONCE per skill invocation:
+
+```bash
+command -v codex >/dev/null && echo CODEX_READY || echo CODEX_MISSING
+```
+
+- If `CODEX_READY`: proceed with `codex exec` dispatches as written.
+- If `CODEX_MISSING`: notify the user ONCE with this exact line (no preamble, no other text):
+
+  > Codex CLI not detected — a Claude subagent will play Codex's writer role for this build. Dual-vendor diversity is degraded; the Opus reviewer remains independent. Install codex (`npm install -g @openai/codex`) for the full dual-model behavior.
+
+  Then in EVERY codex dispatch site below, dispatch the equivalent prompt via the `Agent` tool with `subagent_type: "general-purpose"`, `model: "opus"`, and the prompt body passed as `prompt`. The subagent's reply is the artifact for that round. Round-2 codex-resume mechanics are skipped in this mode — round-2 dispatches are fresh Agent calls with the round-1 artifact + reviewer feedback embedded inline (this is already how the codex prompts are built, so no re-templating needed).
+
+If codex is `READY` but a runtime call fails (auth/network), do the same Agent fallback inline for that one call and note the failure to the user.
+
 ## Assumptions
 
-- **Codex CLI ≥ 0.122.0**, with `codex exec resume` available for round-2 session continuity. Verify with `codex --version`. If the resume command is unavailable, the skill falls back to fresh sessions — prompts always embed prior artifacts inline so the fallback is safe.
+- **Codex CLI ≥ 0.122.0** (preferred path), with `codex exec resume` available for round-2 session continuity. Verify with `codex --version`. If the resume command is unavailable, the skill falls back to fresh sessions — prompts always embed prior artifacts inline so the fallback is safe. If codex itself is missing, see the availability probe above.
 - **Latest Opus is available via `model: "opus"`** in the `Agent` tool. Today that resolves to `claude-opus-4-7`. If the harness changes that binding, the skill still works — it just uses whatever "opus" means.
 - **Latest codex model** is what `codex` selects by default at invocation. If a newer model flag is announced (e.g., `gpt-5.5`), the skill auto-uses whatever is current.
 - **Spec exists at a known path** before invocation. The skill does not run a brainstorm.
