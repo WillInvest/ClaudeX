@@ -57,9 +57,11 @@ sequenceDiagram
     C-->>U: done + audit trail
 ```
 
-**Main Claude is the orchestrator only** — it dispatches Codex (writer) and the Opus reviewer subagent, parses verdicts, decides convergence. It never writes the plan or impl itself.
+**The reviewer judges every artifact against three principles:**
 
-Modifications stay surgical: three insertions in one upstream `SKILL.md` plus one new skill. Modified files are bracketed with `<!-- CLAUDEX:BEGIN -->` / `<!-- CLAUDEX:END -->` markers so upstream merges stay mechanical. Everything else is upstream `superpowers/5.0.7` verbatim.
+- **Minimal** — could the artifact be materially smaller without losing information? Flag only when simplification removes ≥10% of size or eliminates a structural element (a step, a file, a helper). Not word-by-word tightening.
+- **Consistent** — does it follow the project's existing patterns (naming, error style, test structure, file organization)?
+- **Verifiable** — do the tests actually exercise the changed behavior? Would they fail if the implementation were wrong? Or are the assertions tautologies that pass against the artifact itself?
 
 ## What it does, by stage
 
