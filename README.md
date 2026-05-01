@@ -1,22 +1,39 @@
 # ClaudeX
 
 **Multi-model collaboration on top of [superpowers](https://github.com/obra/superpowers) — the official Claude Code plugin for harness flow.** ClaudeX adds Codex into the flow so Claude and Codex — two state-of-the-art models — cooperate inside the same loop. Codex gives a second opinion at every recommendation in brainstorming, then writes plan and implementation while Opus reviews — so drift gets caught even when no human reads the spec.
-
-> **v0.2.0 breaking changes.** If you installed v0.1.x, the marketplace name and one slash-command renamed. Migrate with:
->
-> ```
-> /plugin uninstall claudex
-> /plugin marketplace remove claudex-marketplace
-> /plugin marketplace add WillInvest/ClaudeX
-> /plugin install claudex@willinvest
-> ```
->
-> The renamed surface:
-> - marketplace: `claudex-marketplace` → `willinvest`
-> - command: `/claudex:claudex-build` → `/claudex:build`
-> - The brainstorming skill is unchanged — auto-activates from natural-language intent, or invoke via `/claudex:brainstorming` in the picker.
-
 ---
+
+## Quick start
+
+In Claude Code:
+
+```
+/plugin marketplace add WillInvest/ClaudeX
+/plugin install claudex@willinvest
+```
+
+Then verify the [`codex` CLI](https://github.com/openai/codex) is available (>= 0.122.0):
+
+```bash
+codex --version
+```
+
+If `codex` is not installed, ClaudeX falls back to a Claude subagent for Codex's role — dual-vendor diversity is degraded but independent-context review is preserved.
+
+Then in Claude Code, just describe what you want to build in natural language and the brainstorming skill auto-activates, or invoke it via the picker:
+
+```
+/claudex:brainstorming  let's think how to use AI-Agent to create a AI-DAO for blockchain
+```
+
+ClaudeX takes it from there: Claude + Codex co-brainstorm → spec → autonomous plan → autonomous impl → final summary, with terse 3-line status updates per stage and a full audit trail you can read after. The build pipeline is reachable directly via `/claudex:build`.
+
+To update later:
+
+```
+/plugin marketplace update willinvest
+/plugin update claudex
+```
 
 ## Why ClaudeX
 
@@ -88,57 +105,7 @@ sequenceDiagram
 | Drift defense if user skims | hope | model |
 | Cost | 1 model | 2 models, ~2× tokens at brainstorm peaks |
 
-## Quick start
 
-In Claude Code:
-
-```
-/plugin marketplace add WillInvest/ClaudeX
-/plugin install claudex@willinvest
-```
-
-Then verify the [`codex` CLI](https://github.com/openai/codex) is available (>= 0.122.0):
-
-```bash
-codex --version
-```
-
-If `codex` is not installed, ClaudeX falls back to a Claude subagent for Codex's role — dual-vendor diversity is degraded but independent-context review is preserved.
-
-Then in Claude Code, just describe what you want to build in natural language and the brainstorming skill auto-activates, or invoke it via the picker:
-
-```
-/claudex:brainstorming  let's add a --verbose flag to my CLI tool
-```
-
-ClaudeX takes it from there: Claude + Codex co-brainstorm → spec → autonomous plan → autonomous impl → final summary, with terse 3-line status updates per stage and a full audit trail you can read after. The build pipeline is reachable directly via `/claudex:build`.
-
-To update later:
-
-```
-/plugin marketplace update willinvest
-/plugin update claudex
-```
-
-<details>
-<summary>Manual install (fallback, pre-marketplace)</summary>
-
-```bash
-# 1. Clone alongside any existing superpowers install (no collision)
-git clone https://github.com/WillInvest/ClaudeX.git ~/.claude/plugins/claudex
-
-# 2. Symlink the skills + command into the user-local Claude Code path
-ln -s ~/.claude/plugins/claudex/skills/brainstorming  ~/.claude/skills/claudex-brainstorming
-ln -s ~/.claude/plugins/claudex/skills/build          ~/.claude/skills/claudex-build
-ln -s ~/.claude/plugins/claudex/commands/build.md     ~/.claude/commands/claudex-build.md
-
-# 3. Verify codex CLI is available (optional — claudex falls back to a Claude subagent if missing)
-codex --version  # need >= 0.122.0
-```
-
-The brainstorming skill auto-activates from natural-language intent; with manual install you can also invoke `/claudex-build` (no namespace prefix) directly.
-
-</details>
 
 ## Credits & license
 
