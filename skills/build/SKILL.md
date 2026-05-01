@@ -182,12 +182,14 @@ Save the reviewer's response as `13-plan-r1-review.md`.
 If round 1 verdict is `re-review-needed`, build `14-plan-r2-prompt.md` containing the round-1 review items + the previous plan, and resume the codex session:
 
 ```bash
-codex exec resume --last \
-  -C /tmp/claudex/$RUN_ID \
-  - < /tmp/claudex/$RUN_ID/14-plan-r2-prompt.md \
-  > /tmp/claudex/$RUN_ID/15-plan-r2.md \
-  2>&1
+( cd /tmp/claudex/$RUN_ID && \
+  codex exec resume --last \
+    - < /tmp/claudex/$RUN_ID/14-plan-r2-prompt.md \
+    > /tmp/claudex/$RUN_ID/15-plan-r2.md \
+    2>&1 )
 ```
+
+Note: `codex exec resume` does not accept `-C/--cd` (only `codex exec` does), so cd into the run dir in a subshell instead.
 
 If `resume --last` picks the wrong session, fall back to a fresh `codex exec` — the prompt embeds the previous plan inline, so the fallback is safe.
 
@@ -242,13 +244,14 @@ Save as `22-impl-r1-review.md`.
 Round 2 prompt (`23-impl-r2-prompt.md`) references the round-1 diff and review. Resume the codex session so it remembers the implementation context:
 
 ```bash
-codex exec resume --last \
-  --sandbox workspace-write \
-  -C <repo-root> \
-  - < /tmp/claudex/$RUN_ID/23-impl-r2-prompt.md \
-  > /tmp/claudex/$RUN_ID/24-impl-r2.log \
-  2>&1
+( cd <repo-root> && \
+  codex exec resume --last --full-auto \
+    - < /tmp/claudex/$RUN_ID/23-impl-r2-prompt.md \
+    > /tmp/claudex/$RUN_ID/24-impl-r2.log \
+    2>&1 )
 ```
+
+Note: `codex exec resume` does not accept `-C/--cd` or `--sandbox` (only `codex exec` does). Use `--full-auto` (the workspace-write alias) and cd into `<repo-root>` in a subshell.
 
 The reviewer for round 2 should focus on **what changed since round 1** and verify each round-1 finding was addressed — pass both the round-1 review and the new diff.
 
