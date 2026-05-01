@@ -2,8 +2,6 @@
   "name": "claudex",
   "version": "0.1.0",
   "description": "Multi-model collaboration for Claude Code: Codex as second-opinion reviewer in brainstorming + autonomous Codex-writes / Opus-reviews plan→impl pipeline. Fork of obra/superpowers.",
-  "type": "module",
-  "main": ".opencode/plugins/superpowers.js",
   "author": {
     "name": "Hao Fu",
     "email": "willinvest11@gmail.com"
