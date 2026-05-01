@@ -1,20 +1,28 @@
 {
-  "name": "superpowers",
-  "description": "Core skills library for Claude Code: TDD, debugging, collaboration patterns, and proven techniques",
-  "version": "5.0.7",
+  "name": "claudex",
+  "description": "Multi-model collaboration for Claude Code: Codex as second-opinion reviewer in brainstorming + autonomous Codex-writes / Opus-reviews plan→impl pipeline. Fork of obra/superpowers.",
+  "version": "0.1.0",
   "author": {
-    "name": "Jesse Vincent",
-    "email": "jesse@fsck.com"
+    "name": "Hao Fu",
+    "email": "willinvest11@gmail.com"
   },
-  "homepage": "https://github.com/obra/superpowers",
-  "repository": "https://github.com/obra/superpowers",
+  "homepage": "https://github.com/WillInvest/ClaudeX",
+  "repository": "https://github.com/WillInvest/ClaudeX",
   "license": "MIT",
   "keywords": [
+    "claude-code",
+    "codex",
+    "multi-model",
+    "brainstorming",
+    "code-review",
+    "opus",
     "skills",
-    "tdd",
-    "debugging",
-    "collaboration",
-    "best-practices",
-    "workflows"
-  ]
+    "agentic-workflow"
+  ],
+  "forked-from": {
+    "name": "superpowers",
+    "version": "5.0.7",
+    "url": "https://github.com/obra/superpowers",
+    "author": "Jesse Vincent <jesse@fsck.com>"
+  }
 }
