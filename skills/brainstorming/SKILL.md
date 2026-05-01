@@ -127,7 +127,17 @@ When a decision is made, append it to `/tmp/claudex/${RUN_ID}/03-decisions.md` i
 - Source: user, Claude recommendation, Codex recommendation, or both
 - `Picked-over:` whenever the user rejects either model's recommendation
 
-Whenever you are about to ask a question that offers multiple choices or carries a recommendation, dispatch `second-opinion-prompt.md` first. Present Claude's recommendation and Codex's second opinion side by side, then let the user choose. Do not treat agreement between models as user approval.
+Whenever you are about to ask a question that offers multiple choices or carries a recommendation, draft the question internally — DO NOT show it to the user yet — then dispatch `second-opinion-prompt.md`. Only after Codex's verdict returns, present the question to the user as a single message in this shape:
+
+```
+[your question + options + your recommendation]
+
+[Codex second opinion]: <verdict line>
+
+Your call.
+```
+
+The question must be shown to the user exactly once, with Codex's verdict already embedded. Never announce "Dispatching Codex" with the drafted question visible — that is the duplication anti-pattern. Do not treat agreement between models as user approval.
 
 ## 8. Stage 3: Approaches
 
