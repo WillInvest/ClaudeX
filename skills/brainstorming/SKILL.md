@@ -281,26 +281,37 @@ If Codex outputs `WRONG-DIRECTION: <reason>` as the entire first line, stop the 
 
 Write or overwrite `/tmp/claudex/${RUN_ID}/00-spec.md` from the canonical spec path. This is the binding handoff copy for build.
 
-Probe `command -v tmux >/dev/null`.
+**Bright-line rule: do NOT invoke the `claudex:build` skill (via the `Skill` tool or any other path) until the user has picked 1 or 2 below. Approving the design is NOT approval to start the build. Saying "Starting build." before the user replies, then invoking the skill, is the auto-launch anti-pattern — it skips the inline-vs-detached choice and is a violation of this gate.**
 
-- If tmux is missing: announce `tmux not found — running build inline. Install tmux for detached builds that survive SSH drops.` Invoke build inline and pass the inherited `RUN_ID` in the environment.
-- If tmux is present: ask:
+Probe tmux explicitly via Bash:
+
+```bash
+command -v tmux >/dev/null && echo TMUX_PRESENT || echo TMUX_MISSING
+```
+
+- **TMUX_MISSING** → announce, in this exact form: `tmux not found — running build inline. Install tmux for detached builds that survive SSH drops.` Then export `RUN_ID` and invoke the `claudex:build` skill inline. Skip the prompt below.
+
+- **TMUX_PRESENT** → present this message verbatim as a single user-visible turn, then **STOP and wait for the user's reply**:
 
   ```text
   Spec at <path>. How should I run the build?
-    1. Inline (this session — dies if SSH drops)
-    2. Detached tmux (survives SSH drops; you attach with `tmux attach -t <name>`)
+    1) Inline (this session — dies if SSH drops)
+    2) Detached tmux (survives SSH drops; you attach with `tmux attach -t <name>`)
   ```
 
-Inline mode invokes build in this session with the inherited `RUN_ID`.
+  Do nothing else in that turn — no tool calls, no preamble, no "I will now…" narration. Wait for the user to reply with `1` or `2`.
 
-Detached mode runs the launcher from this skill directory:
+  - Reply `1` → export `RUN_ID` and invoke the `claudex:build` skill inline.
 
-```bash
-bash scripts/start-tmux-build.sh "<spec-path>" "$RUN_ID"
-```
+  - Reply `2` → run the launcher from this skill directory (do NOT invoke the build skill in this session; detached tmux owns the build):
 
-Echo the script's stdout verbatim. Do NOT also invoke build in this session; detached tmux owns the build. The build skill keeps its direct-invocation fallback `RUN_ID="${RUN_ID:-...}"`, so direct `/claudex:build <spec>` behavior remains unchanged while brainstorming handoff preserves the shared run id.
+    ```bash
+    bash scripts/start-tmux-build.sh "<spec-path>" "$RUN_ID"
+    ```
+
+    Echo the script's stdout verbatim.
+
+The build skill keeps its direct-invocation fallback `RUN_ID="${RUN_ID:-...}"`, so direct `/claudex:build <spec>` behavior remains unchanged while brainstorming handoff preserves the shared run id.
 
 At the end of build, `/tmp/claudex/${RUN_ID}/99-final-summary.md` should reference both brainstorm and build artifacts.
 
