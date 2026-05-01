@@ -76,6 +76,30 @@ sequenceDiagram
 
 ## Quick start
 
+In Claude Code:
+
+```
+/plugin marketplace add WillInvest/ClaudeX
+/plugin install claudex@claudex-marketplace
+```
+
+Then verify the [`codex` CLI](https://github.com/openai/codex) is available (>= 0.122.0):
+
+```bash
+codex --version
+```
+
+Then in Claude Code:
+
+```
+/claudex:brainstorm  let's add a --verbose flag to my CLI tool
+```
+
+ClaudeX takes it from there: Claude + Codex co-brainstorm → spec → autonomous plan → autonomous impl → final summary, with terse 3-line status updates per stage and a full audit trail you can read after.
+
+<details>
+<summary>Manual install (fallback, pre-marketplace)</summary>
+
 ```bash
 # 1. Clone alongside any existing superpowers install (no collision)
 git clone https://github.com/WillInvest/ClaudeX.git ~/.claude/plugins/claudex
@@ -90,13 +114,9 @@ ln -s ~/.claude/plugins/claudex/commands/claudex-build.md ~/.claude/commands/cla
 codex --version  # need >= 0.122.0
 ```
 
-Then in Claude Code:
+With manual install the slash commands are `/claudex-brainstorm` and `/claudex-build` (no namespace prefix).
 
-```
-/claudex-brainstorm  let's add a --verbose flag to my CLI tool
-```
-
-ClaudeX takes it from there: Claude + Codex co-brainstorm → spec → autonomous plan → autonomous impl → final summary, with terse 3-line status updates per stage and a full audit trail you can read after.
+</details>
 
 ## Credits & license
 
