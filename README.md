@@ -120,7 +120,7 @@ With manual install the slash commands are `/claudex-brainstorm` and `/claudex-b
 
 ## Credits & license
 
-ClaudeX is a fork of [obra/superpowers](https://github.com/obra/superpowers) by Jesse Vincent — the structural skills (brainstorming, writing-plans, executing-plans, TDD, debugging, ...) are upstream's work; ClaudeX layers a multi-model collaboration pattern on top. Big thanks to the upstream project; without it there's nothing to fork.
+ClaudeX is built upon [obra/superpowers](https://github.com/obra/superpowers) by Jesse Vincent — the structural skills (brainstorming, writing-plans, executing-plans, TDD, debugging, ...) are upstream's work; ClaudeX layers a multi-model collaboration pattern on top. Big thanks to the upstream project; without it there's nothing to build upon.
 
 Released under the [MIT License](./LICENSE), preserving upstream's copyright notice.
 
