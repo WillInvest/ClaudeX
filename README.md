@@ -16,7 +16,7 @@ The intended drift defense is human review. The actual drift defense is hope.
 
 **ClaudeX replaces the missing human gate with a model gate.** Two models, different vendors, different inductive biases — Claude (Opus) and OpenAI Codex. They disagree on real things. Their disagreements catch real bugs.
 
-## How ClaudeX runs (vs upstream's single-model loop)
+## How ClaudeX runs
 
 In `superpowers`, one model runs the whole pipeline (brainstorm → spec → plan → impl) and the user is expected to gate at the spec. ClaudeX makes the loop multi-actor: every recommendation gets a Codex second opinion, and every artifact (plan, impl) gets an independent Opus review.
 
