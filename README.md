@@ -41,17 +41,17 @@ sequenceDiagram
 
     rect rgba(60,120,255,0.08)
         Note over C,O: PLAN stage
-        C->>X: dispatch (write plan)
-        X-->>C: plan
-        C->>O: dispatch (review plan vs spec)
-        O-->>C: DRIFT + QUALITY → VERDICT
+        C->>X: dispatch 
+        X-->>C: write plan
+        C->>O: dispatch
+        O-->>C: review
     end
     rect rgba(60,120,255,0.08)
         Note over C,O: IMPL stage
-        C->>X: dispatch (write impl)
-        X-->>C: impl
-        C->>O: dispatch (review impl vs plan)
-        O-->>C: DRIFT + QUALITY → VERDICT
+        C->>X: dispatch 
+        X-->>C: write code
+        C->>O: dispatch
+        O-->>C: review
     end
 
     C-->>U: done + audit trail
