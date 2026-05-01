@@ -20,7 +20,6 @@ dropped at fork and stay dropped on every merge:
 - `.codex/`, `.codex-plugin/`, `.cursor-plugin/`, `.opencode/`
 - `gemini-extension.json`, `GEMINI.md`, `AGENTS.md`
 - `docs/README.codex.md`, `docs/README.opencode.md`
-- `tests/codex-plugin-sync/`, `tests/opencode/`, `tests/brainstorm-server/`
 - `scripts/sync-to-codex-plugin.sh`
 - `hooks/hooks-cursor.json`, `hooks/run-hook.cmd` (Windows polyglot)
 - `docs/windows/`
@@ -30,8 +29,15 @@ Upstream governance/history that points at obra is also dropped:
 - `RELEASE-NOTES.md`, `CODE_OF_CONDUCT.md`
 - `.github/FUNDING.yml`, `.github/PULL_REQUEST_TEMPLATE.md`,
   `.github/ISSUE_TEMPLATE/`
-- `docs/plans/`, `docs/superpowers/`
+- `docs/plans/`, `docs/superpowers/`, `docs/testing.md`
 - `assets/superpowers-small.svg`
+
+Upstream test harness — not run in ClaudeX, no CI here; smoke testing
+happens via `claudex-build` audit trails at `/tmp/claudex/<run-id>/`:
+
+- `tests/` (entire directory: `claude-code/`, `explicit-skill-requests/`,
+  `skill-triggering/`, `subagent-driven-dev/`, plus the already-dropped
+  `codex-plugin-sync/`, `opencode/`, `brainstorm-server/`)
 
 ## Modification surface
 
