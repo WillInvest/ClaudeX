@@ -25,33 +25,33 @@ In `superpowers`, one model runs the whole pipeline (brainstorm → spec → pla
 ```mermaid
 sequenceDiagram
     actor U as User
-    participant C as Main Claude
-    participant X as Codex
-    participant O as Opus reviewer
+    participant C as Main Claude<br/>(orchestrator)
+    participant X as Codex<br/>(writer)
+    participant O as Opus reviewer<br/>(fresh subagent)
 
     U->>C: /claudex-brainstorm
     loop every recommendation
-        C->>X: 2nd opinion?
+        C->>X: dispatch (2nd opinion?)
         X-->>C: AGREE / DISAGREE / ANGLE-MISSED
     end
     Note over C,X: design converges
-    C->>X: final verdict
+    C->>X: dispatch (final verdict)
     X-->>C: READY / FIX / WRONG-DIRECTION
     Note over C: hand off → /claudex-build
 
     rect rgba(60,120,255,0.08)
         Note over C,O: PLAN stage
-        C->>X: write plan
+        C->>X: dispatch (write plan)
         X-->>C: plan
-        C->>O: review (DRIFT + QUALITY)
-        O-->>C: VERDICT
+        C->>O: dispatch (review plan vs spec)
+        O-->>C: DRIFT + QUALITY → VERDICT
     end
     rect rgba(60,120,255,0.08)
         Note over C,O: IMPL stage
-        C->>X: write impl
+        C->>X: dispatch (write impl)
         X-->>C: impl
-        C->>O: review (DRIFT + QUALITY)
-        O-->>C: VERDICT
+        C->>O: dispatch (review impl vs plan)
+        O-->>C: DRIFT + QUALITY → VERDICT
     end
 
     C-->>U: done + audit trail
