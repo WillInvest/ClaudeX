@@ -2,8 +2,6 @@
 
 **Multi-model collaboration on top of [superpowers](https://github.com/obra/superpowers).** Codex gives a second opinion at every recommendation in brainstorming, then writes plan and implementation while Opus reviews — so drift gets caught even when no human reads the spec.
 
-> Status: `v0.1.0-verified` — three end-to-end smoke tests passing. Looking for feedback and stars.
-
 ---
 
 ## Why ClaudeX
