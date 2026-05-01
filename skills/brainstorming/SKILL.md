@@ -50,7 +50,7 @@ Fallback attribution is explicit: outputs produced by the fallback are labeled `
 
 | Role | Who | What they do | What they NEVER do |
 |---|---|---|---|
-| Orchestrator | Main Claude (you) | Probe Codex; drive the user dialogue; write audit files; dispatch Codex and Opus; present questions, options, and design sections; enforce gates; decide loop control from reviewer verdicts | Implement; skip the approved design gate; let Claude-only recommendations silently drive final scope |
+| Orchestrator | Main Claude (you) | Probe Codex; drive the user dialogue; write audit files; dispatch Codex and Opus; present questions, options, and design sections; enforce gates; decide loop control from reviewer verdicts | Implement; write or edit the spec body (Codex authors every byte of spec content); skip the approved design gate; let Claude-only recommendations silently drive final scope |
 | Framing challenger | Codex A1 | Review initial framing before the first clarifying question using `intake-prompt.md` | See Claude's later questions; write the spec |
 | Angle auditor | Codex A3 | Check for missed angles before independent approaches using `angle-audit-prompt.md` | Receive Claude's draft proposals |
 | Independent proposer | Codex A2 | Produce independent approaches from transcript and decisions using `approaches-codex-prompt.md` | Read Claude's draft approaches; inherit main-session context |
@@ -177,7 +177,9 @@ If the user redirects mid-dialogue, append the redirect to `02-transcript.md`, u
 
 ## 10. Stage 5: Spec write + Opus review
 
-Freeze `/tmp/claudex/${RUN_ID}/03-decisions.md` when Stage 4 approval is complete. From this point, do not edit it. Codex-only spec edits are allowed; Claude does not write or patch the spec body except to remove Codex wrapper text during cleanup.
+**Bright-line rule for the orchestrator at this stage:** you NEVER use the `Write` tool to author spec body content. Every byte of the spec body comes from `codex exec` output. Your only allowed file actions at Stage 5 are: (a) writing the prompt files in `/tmp/claudex/${RUN_ID}/`; (b) running `cp` / shell redirection to clean Codex output and copy it to the canonical spec path; (c) writing the Opus reviewer's response file. If you find yourself drafting Markdown spec sections in your own response and using `Write`, stop. The contract is the contract.
+
+Freeze `/tmp/claudex/${RUN_ID}/03-decisions.md` when Stage 4 approval is complete. From this point, do not edit it. Codex-only spec edits are allowed; Claude does not write or patch the spec body except to mechanically strip Codex wrapper text during cleanup (a `sed`/`awk` shell pass, not Markdown authoring).
 
 Codex writes the spec using `spec-codex-prompt.md` with `{{TRANSCRIPT}}`, `{{DECISIONS}}`, `{{APPROACHES}}`, and `{{DESIGN}}`. The spec body structure is:
 
@@ -196,7 +198,35 @@ Codex writes the spec using `spec-codex-prompt.md` with `{{TRANSCRIPT}}`, `{{DEC
 
 The `## Decisions preamble` content must byte-match frozen `03-decisions.md`. A mismatch is DRIFT.
 
-Canonical loop:
+Canonical loop (concrete bash + Agent dispatches; pseudocode below as a roadmap):
+
+```bash
+# Build the round-1 prompt by filling spec-codex-prompt.md slots, write to:
+#   /tmp/claudex/${RUN_ID}/spec-prompt-r1.md
+
+# Round 1 — Codex writes the spec.
+codex exec \
+  --sandbox read-only \
+  --skip-git-repo-check \
+  -C "/tmp/claudex/${RUN_ID}" \
+  - < "/tmp/claudex/${RUN_ID}/spec-prompt-r1.md" \
+  > "/tmp/claudex/${RUN_ID}/06-spec-r1.md" \
+  2>&1
+
+# Strip Codex wrapper noise (e.g. session banner, "tokens used" footer) — shell only.
+sed -n '/^# /,$p' "/tmp/claudex/${RUN_ID}/06-spec-r1.md" \
+  | sed '/^tokens used/,$d' \
+  > "/tmp/claudex/${RUN_ID}/06-spec-r1.clean.md"
+
+# Copy to canonical spec path (overwrite each round; do NOT use the Write tool).
+cp "/tmp/claudex/${RUN_ID}/06-spec-r1.clean.md" "${CANONICAL_SPEC_PATH}"
+```
+
+Then dispatch the Opus reviewer with the `Agent` tool (`subagent_type: "general-purpose"`, `model: "opus"`), using `spec-reviewer-prompt.md` filled with `{{TRANSCRIPT}} {{DECISIONS}} {{APPROACHES}} {{SPEC}}`. Save the reviewer's reply to `/tmp/claudex/${RUN_ID}/07-spec-r1-review.md`.
+
+If `codex` is `MISSING` or fails at runtime, dispatch the same prompt via `Agent` (`model: "sonnet"`); the subagent's reply IS the round's spec output. Strip wrapper noise the same way and `cp` to canonical. Never substitute `Write` for `cp` here — the rule is about the *source* of the bytes, and `cp` makes that auditable.
+
+Roadmap (read with the bash above):
 
 ```python
 spec = dispatch_codex("06-spec-r1.md")
