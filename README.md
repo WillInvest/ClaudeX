@@ -63,57 +63,6 @@ sequenceDiagram
 - **Consistent** — does it follow the project's existing patterns (naming, error style, test structure, file organization)?
 - **Verifiable** — do the tests actually exercise the changed behavior? Would they fail if the implementation were wrong? Or are the assertions tautologies that pass against the artifact itself?
 
-## What it does, by stage
-
-### `/claudex-brainstorm` — second-opinion at every decision
-
-Three Codex insertions on top of upstream's brainstorming flow:
-
-| When it fires | What happens | Output | Cap |
-|---|---|---|---|
-| Claude is about to ask a multi-choice / "I recommend X" question | dispatch `codex exec` with the transcript + Claude's draft rec | side-by-side: `AGREE` / `DISAGREE` / `ANGLE-MISSED` | ≤60 words |
-| Design has converged, before spec is written | dispatch `codex exec` with full transcript + agreed design | `READY` / `FIX` / `WRONG-DIRECTION` (one shot, no re-dispatch) | ≤200 words |
-| Spec is written | upstream's "user reviews spec" gate is **removed**; hand off directly | invoke `/claudex-build` | — |
-
-If `codex` is unavailable, the brainstorm gracefully falls back to upstream behavior — Codex insertions are additive, never blocking.
-
-### `/claudex-build` — autonomous plan → impl with two-model review
-
-Each stage runs the same loop. The orchestrator (main Claude) only dispatches and decides; it never writes the artifact itself.
-
-```mermaid
-flowchart TD
-    A[Codex writes artifact<br/><i>plan, then impl</i>] --> B[Opus 4.7 subagent reviews<br/>DRIFT + QUALITY + VERDICT]
-    B --> C{verdict}
-    C -->|ready-to-execute| Z([proceed])
-    C -->|fix-and-proceed| D[Codex applies fixes<br/><i>no re-review</i>] --> Z
-    C -->|escalate| X([stop, ask user])
-    C -->|re-review-needed| E[Codex rewrites] --> F[Opus reviews again]
-    F --> G{round-2 verdict}
-    G -->|ready-to-execute| Z
-    G -->|fix-and-proceed| H[Codex final fix] --> Z
-    G -->|otherwise| X
-```
-
-**Reviewer output is structured.** Three sections in this exact order:
-
-| Section | Purpose | Tags / shape |
-|---|---|---|
-| `## DRIFT` | Where artifact diverges from source (spec → plan, plan → impl) | numbered list; `none` if clean |
-| `## QUALITY` | Issues against three criteria | `[Minimal]` / `[Consistent]` / `[Verifiable]` |
-| `## VERDICT` | One-liner that the orchestrator parses literally | one of four strings (below) |
-
-**The four verdicts:**
-
-| Verdict | What it means | Loop action |
-|---|---|---|
-| `ready-to-execute` | DRIFT empty AND no blocking QUALITY findings | proceed, no fix |
-| `fix-and-proceed` | minor actionable issues; reviewer signs off in advance | Codex applies fixes, no re-review |
-| `re-review-needed` | substantive issues needing judgment | Codex rewrites + round-2 review (round 1 only) |
-| `escalate` | wrong direction, missing context, destructive risk | stop, surface to user |
-
-Hard cap: **2 review rounds per stage.** Round 2 is final — `re-review-needed` at round 2 escalates instead of looping. Audit trail at `/tmp/claudex/<run-id>/` (numbered files: `00-spec.md`, `10-plan-prompt.md`, `11-plan-r1.md`, ..., `99-final-summary.md`).
-
 ## Side-by-side with plain `superpowers`
 
 | | superpowers | ClaudeX |
@@ -126,8 +75,6 @@ Hard cap: **2 review rounds per stage.** Round 2 is final — `re-review-needed`
 | Impl reviewer | none / user | fresh Opus 4.7 subagent |
 | Drift defense if user skims | hope | model |
 | Cost | 1 model | 2 models, ~2× tokens at brainstorm peaks |
-
-If your spec/plan/impl review habit is reliable, plain `superpowers` is fine — ClaudeX is the right call when the loop has to be honest about how little the user actually reads.
 
 ## Quick start
 
@@ -152,29 +99,6 @@ Then in Claude Code:
 ```
 
 ClaudeX takes it from there: Claude + Codex co-brainstorm → spec → autonomous plan → autonomous impl → final summary, with terse 3-line status updates per stage and a full audit trail you can read after.
-
-## Requirements
-
-- **Claude Code** with `Agent` tool and `model: "opus"` resolution (today: Opus 4.7).
-- **Codex CLI** ≥ 0.122.0 (`codex exec resume --last` is required for round-2 session continuity).
-- Both `claude` and `codex` available on your `$PATH`.
-
-## Project layout
-
-```
-~/.claude/plugins/claudex/
-├── skills/
-│   ├── brainstorming/SKILL.md   # 3 CLAUDEX:BEGIN/END insertions over upstream
-│   └── claudex-build/SKILL.md   # new — autonomous plan→impl pipeline
-├── commands/
-│   ├── brainstorm.md            # deprecation-stub redirect
-│   └── claudex-build.md         # /claudex-build
-├── UPSTREAM.md                  # fork base + merge log
-├── LICENSE                      # MIT (preserves upstream copyright)
-└── ...                          # rest is upstream superpowers/5.0.7 verbatim
-```
-
-See [UPSTREAM.md](./UPSTREAM.md) for the merge procedure when upstream releases a new version.
 
 ## Credits & license
 
