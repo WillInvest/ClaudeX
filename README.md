@@ -1,6 +1,7 @@
 # ClaudeX
 
 **Multi-model collaboration on top of [superpowers](https://github.com/obra/superpowers) — the official Claude Code plugin for harness flow.** ClaudeX adds Codex into the flow so Claude and Codex — two state-of-the-art models — cooperate inside the same loop. Codex gives a second opinion at every recommendation in brainstorming, then writes plan and implementation while Opus reviews — so drift gets caught even when no human reads the spec.
+
 ---
 
 ## Quick start
