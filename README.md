@@ -18,21 +18,46 @@ The intended drift defense is human review. The actual drift defense is hope.
 
 **ClaudeX replaces the missing human gate with a model gate.** Two models, different vendors, different inductive biases — Claude (Opus) and OpenAI Codex. They disagree on real things. Their disagreements catch real bugs.
 
-## How it differs from superpowers
+## How ClaudeX runs (vs upstream's single-model loop)
+
+In `superpowers`, one model runs the whole pipeline (brainstorm → spec → plan → impl) and the user is expected to gate at the spec. ClaudeX makes the loop multi-actor: every recommendation gets a Codex second opinion, and every artifact (plan, impl) gets an independent Opus review.
 
 ```mermaid
-flowchart LR
-    subgraph SP["superpowers (single-model)"]
-        SPB[brainstorm<br/>1 rec/question] --> SPS[spec<br/>same model]
-        SPS -.user reads?.-> SPP[plan<br/>same model]
-        SPP -.user reads?.-> SPI[impl<br/>same model]
+sequenceDiagram
+    actor U as User
+    participant C as Main Claude
+    participant X as Codex
+    participant O as Opus reviewer
+
+    U->>C: /claudex-brainstorm
+    loop every recommendation
+        C->>X: 2nd opinion?
+        X-->>C: AGREE / DISAGREE / ANGLE-MISSED
     end
-    subgraph CX["ClaudeX (dual-model)"]
-        CXB[brainstorm<br/>Claude rec + Codex 2nd opinion] --> CXS[spec<br/>after Codex final-design verdict]
-        CXS --> CXP[plan<br/>Codex writes / Opus reviews]
-        CXP --> CXI[impl<br/>Codex writes / Opus reviews]
+    Note over C,X: design converges
+    C->>X: final verdict
+    X-->>C: READY / FIX / WRONG-DIRECTION
+    Note over C: hand off → /claudex-build
+
+    rect rgba(60,120,255,0.08)
+        Note over C,O: PLAN stage
+        C->>X: write plan
+        X-->>C: plan
+        C->>O: review (DRIFT + QUALITY)
+        O-->>C: VERDICT
     end
+    rect rgba(60,120,255,0.08)
+        Note over C,O: IMPL stage
+        C->>X: write impl
+        X-->>C: impl
+        C->>O: review (DRIFT + QUALITY)
+        O-->>C: VERDICT
+    end
+
+    C-->>U: done + audit trail
 ```
+
+**Main Claude is the orchestrator only** — it dispatches Codex (writer) and the Opus reviewer subagent, parses verdicts, decides convergence. It never writes the plan or impl itself.
 
 Modifications stay surgical: three insertions in one upstream `SKILL.md` plus one new skill. Modified files are bracketed with `<!-- CLAUDEX:BEGIN -->` / `<!-- CLAUDEX:END -->` markers so upstream merges stay mechanical. Everything else is upstream `superpowers/5.0.7` verbatim.
 
