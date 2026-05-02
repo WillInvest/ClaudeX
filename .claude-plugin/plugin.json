@@ -1,7 +1,7 @@
 {
   "name": "claudex",
   "description": "Multi-model collaboration for Claude Code: Codex as second-opinion reviewer in brainstorming + autonomous Codex-writes / Opus-reviews plan→impl pipeline. Built upon obra/superpowers.",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "author": {
     "name": "Hao Fu",
     "email": "willinvest11@gmail.com"
