@@ -4,18 +4,28 @@ description: Design-first workflow for turning a user idea into an approved impl
 ---
 
 # claudex-think
-Use `/claudex:think` when the user has an idea that needs framing, tradeoffs, design approval, and an implementation-ready spec before build. The terminal output of this skill is an accepted spec at `docs/claudex/specs/<date>-<topic>-design.md` and the same spec copied to `${HOME}/claudex-audits/${RUN_ID}/00-spec.md`.
+Use `/claudex:think` when the user has an idea that needs framing, tradeoffs, design approval, and an implementation-ready spec before build. The terminal output of this skill is an accepted spec written to a project-relative path (see "Spec destination resolution" in Stage 0) and the same spec copied to `${HOME}/vault/projects/claudex/audits/${RUN_ID}/00-spec.md` for the audit trail.
 
 Every user-decision-requesting turn requires a 2nd-opinion dispatch before showing the turn to the user. The dispatch uses `scripts/dispatch-codex-2nd-opinion.sh`. If `CODEX_STATE=READY` (Stage 0 probe), the dispatch invokes `codex exec`. If `CODEX_STATE=MISSING`, the dispatch invokes a Claude subagent (Agent tool, model='sonnet') with the same prompt template, and the verdict line is labeled `[Codex(fallback)] AGREE/DISAGREE/ANGLE-MISSED: ...` in audit and user-visible output. In both modes the closed-schema verdict tokens are the same; an unparsable verdict (exit 5) halts in both modes.
 
 ## Stage 0 — Setup
 
-Create `RUN_ID="$(date -u +%Y-%m-%d-%H%M)-<slug>"`, `RUN_DIR="${HOME}/claudex-audits/${RUN_ID}"`, and initialize `00-setup.md`, `02-transcript.md`, and `03-decisions.md`; use a short kebab-case slug from the user's goal. (`${HOME}/claudex-audits/` replaces the previous `/tmp/claudex/` location so audit trails survive reboots and `tmpfiles` cleanup.)
+Create `RUN_ID="$(date -u +%Y-%m-%d-%H%M)-<slug>"`, `RUN_DIR="${HOME}/vault/projects/claudex/audits/${RUN_ID}"`, and initialize `00-setup.md`, `02-transcript.md`, and `03-decisions.md`; use a short kebab-case slug from the user's goal. (`${HOME}/vault/projects/claudex/audits/` is the unified home for all run trails — earlier paths were `/tmp/claudex/` and `${HOME}/claudex-audits/`.)
+
+### Spec destination resolution
+
+The canonical spec lands in a project-relative location based on cwd, resolved at Stage 0. Resolution rules in priority order:
+
+1. **Vault project.** If cwd or any parent is `${HOME}/vault/projects/<X>/` for some `<X>`, the spec destination is `${HOME}/vault/projects/<X>/specs/<date>-<topic>-design.md` (no `docs/claudex/` prefix; matches the convention that vault projects own their `specs/`).
+2. **Other project repo.** Else if `git rev-parse --show-toplevel` succeeds and produces a path outside `${HOME}/vault/`, the spec destination is `<git-toplevel>/docs/claudex/specs/<date>-<topic>-design.md` (preserves today's behavior for plugin-source checkouts and external project repos).
+3. **No project context.** Else (cwd is unbound or somewhere with no recognizable project root), fall back to `${HOME}/vault/projects/claudex/specs/<date>-<topic>-design.md` — claudex meta-work specs land here.
+
+Compute the destination once at Stage 0 and store it as `CANONICAL_SPEC_PATH`; downstream stages use that variable. Print the resolved path to the user once during Stage 0 so they know where the spec will land.
 
 ### Inputs
 
 - `RUN_ID`: stable audit identifier for the whole think/build chain.
-- `RUN_DIR`: `${HOME}/claudex-audits/${RUN_ID}` audit directory.
+- `RUN_DIR`: `${HOME}/vault/projects/claudex/audits/${RUN_ID}` audit directory.
 - `PATH`: used by probe scripts.
 - `skills/build/SKILL.md`: build handoff must remain reachable.
 
@@ -191,7 +201,7 @@ bash scripts/build-opus-spec-review-prompt.sh "$RUN_DIR" "$REVIEW_ROUND" "$RUN_D
 
 ## Stage 5 — Handoff
 
-Copy the accepted canonical spec to `${HOME}/claudex-audits/${RUN_ID}/00-spec.md`, export `RUN_ID`, and ask the user whether to launch build inline or detached. The build-choice presentation is a user-decision-requesting turn, so run the second opinion before showing choices. The user must answer literal `1` or `2`; write it to `${RUN_DIR}/.user-build-choice`. Stage 5 dispatch order is: cp → 2nd-opinion → user-choice gate → probe-tmux → invoke.
+Copy the accepted canonical spec to `${HOME}/vault/projects/claudex/audits/${RUN_ID}/00-spec.md`, export `RUN_ID`, and ask the user whether to launch build inline or detached. The build-choice presentation is a user-decision-requesting turn, so run the second opinion before showing choices. The user must answer literal `1` or `2`; write it to `${RUN_DIR}/.user-build-choice`. Stage 5 dispatch order is: cp → 2nd-opinion → user-choice gate → probe-tmux → invoke.
 
 ### Inputs
 
