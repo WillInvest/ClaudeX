@@ -167,5 +167,8 @@ then
 fi
 
 # Copy clean spec to canonical path. cp = mechanical, auditable.
+# Ensure the destination dir exists — Stage 0's cwd-aware resolution may pick
+# a vault project's specs/ dir that has not been created yet.
+mkdir -p "$(dirname "$CANONICAL_PATH")"
 cp "$CLEAN" "$CANONICAL_PATH"
 echo "ok: round=$ROUND clean=$CLEAN canonical=$CANONICAL_PATH"

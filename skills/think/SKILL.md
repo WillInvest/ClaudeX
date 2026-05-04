@@ -18,7 +18,7 @@ The canonical spec lands in a project-relative location based on cwd, resolved a
 
 1. **Vault project.** If cwd or any parent is `${HOME}/vault/projects/<X>/` for some `<X>`, the spec destination is `${HOME}/vault/projects/<X>/specs/<date>-<topic>-design.md` (no `docs/claudex/` prefix; matches the convention that vault projects own their `specs/`).
 2. **Other project repo.** Else if `git rev-parse --show-toplevel` succeeds and produces a path outside `${HOME}/vault/`, the spec destination is `<git-toplevel>/docs/claudex/specs/<date>-<topic>-design.md` (preserves today's behavior for plugin-source checkouts and external project repos).
-3. **No project context.** Else (cwd is unbound or somewhere with no recognizable project root), fall back to `${HOME}/vault/projects/claudex/specs/<date>-<topic>-design.md` — claudex meta-work specs land here.
+3. **No project context (or vault cwd outside `projects/<X>/`).** Else — including cwd inside `${HOME}/vault/` but not under any `projects/<X>/` (e.g. `${HOME}/vault/`, `${HOME}/vault/agent-log/`, `${HOME}/vault/teaching/`), and cwd outside the vault with no enclosing project — fall back to `${HOME}/vault/projects/claudex/specs/<date>-<topic>-design.md`. Claudex meta-work specs land here.
 
 Compute the destination once at Stage 0 and store it as `CANONICAL_SPEC_PATH`; downstream stages use that variable. Print the resolved path to the user once during Stage 0 so they know where the spec will land.
 
@@ -160,7 +160,7 @@ bash scripts/gate-design-approval.sh "$RUN_DIR"
 
 ## Stage 4 — Spec Write + Opus Review
 
-Freeze decisions, then dispatch Codex to write the spec. The accepted spec path is `docs/claudex/specs/<date>-<topic>-design.md`. The orchestrator does not author spec body text. Opus review uses Agent tool with `model='opus'` in both Codex states.
+Freeze decisions, then dispatch Codex to write the spec. The accepted spec is written to `$CANONICAL_SPEC_PATH` (resolved at Stage 0 — see "Spec destination resolution"). The orchestrator does not author spec body text. Opus review uses Agent tool with `model='opus'` in both Codex states.
 
 Review loop: round 1 spec, Opus review, optional fix or round 2, final Opus review if needed. If round 2 still returns `re-review-needed` or `escalate`, halt; do not start a third review round.
 
@@ -171,7 +171,7 @@ Review loop: round 1 spec, Opus review, optional fix or round 2, final Opus revi
 - `${RUN_DIR}/03-decisions.frozen`: freeze marker.
 - `${RUN_DIR}/04-design.md`: approved design.
 - `${RUN_DIR}/05-approaches.md`: approach context.
-- `docs/claudex/specs/<date>-<topic>-design.md`: canonical accepted spec destination.
+- `$CANONICAL_SPEC_PATH`: canonical accepted spec destination (resolved at Stage 0).
 
 ### Dispatch
 
