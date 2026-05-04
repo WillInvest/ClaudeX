@@ -4,18 +4,18 @@ description: Design-first workflow for turning a user idea into an approved impl
 ---
 
 # claudex-think
-Use `/claudex:think` when the user has an idea that needs framing, tradeoffs, design approval, and an implementation-ready spec before build. The terminal output of this skill is an accepted spec at `docs/claudex/specs/<date>-<topic>-design.md` and the same spec copied to `/tmp/claudex/${RUN_ID}/00-spec.md`.
+Use `/claudex:think` when the user has an idea that needs framing, tradeoffs, design approval, and an implementation-ready spec before build. The terminal output of this skill is an accepted spec at `docs/claudex/specs/<date>-<topic>-design.md` and the same spec copied to `${HOME}/claudex-audits/${RUN_ID}/00-spec.md`.
 
 Every user-decision-requesting turn requires a 2nd-opinion dispatch before showing the turn to the user. The dispatch uses `scripts/dispatch-codex-2nd-opinion.sh`. If `CODEX_STATE=READY` (Stage 0 probe), the dispatch invokes `codex exec`. If `CODEX_STATE=MISSING`, the dispatch invokes a Claude subagent (Agent tool, model='sonnet') with the same prompt template, and the verdict line is labeled `[Codex(fallback)] AGREE/DISAGREE/ANGLE-MISSED: ...` in audit and user-visible output. In both modes the closed-schema verdict tokens are the same; an unparsable verdict (exit 5) halts in both modes.
 
 ## Stage 0 — Setup
 
-Create `RUN_ID="$(date -u +%Y-%m-%d-%H%M)-<slug>"`, `RUN_DIR="/tmp/claudex/${RUN_ID}"`, and initialize `00-setup.md`, `02-transcript.md`, and `03-decisions.md`; use a short kebab-case slug from the user's goal.
+Create `RUN_ID="$(date -u +%Y-%m-%d-%H%M)-<slug>"`, `RUN_DIR="${HOME}/claudex-audits/${RUN_ID}"`, and initialize `00-setup.md`, `02-transcript.md`, and `03-decisions.md`; use a short kebab-case slug from the user's goal. (`${HOME}/claudex-audits/` replaces the previous `/tmp/claudex/` location so audit trails survive reboots and `tmpfiles` cleanup.)
 
 ### Inputs
 
 - `RUN_ID`: stable audit identifier for the whole think/build chain.
-- `RUN_DIR`: `/tmp/claudex/${RUN_ID}` audit directory.
+- `RUN_DIR`: `${HOME}/claudex-audits/${RUN_ID}` audit directory.
 - `PATH`: used by probe scripts.
 - `skills/build/SKILL.md`: build handoff must remain reachable.
 
@@ -41,7 +41,14 @@ bash scripts/probe.sh claudex-build
 
 Ask one focused question at a time. Append every user-visible question, second-opinion verdict, and answer as it happens; append decisions immediately when made. Pure factual or informational replies do not need a second opinion.
 
-Before any pick, confirm, approve, prefer, accept, proceed, revisit, or stop turn, write the drafted question to `${RUN_DIR}/.q.md` and Claude's recommendation or neutral framing to `${RUN_DIR}/.r.md`; do not show it yet. Run the 2nd-opinion path, then show one message containing the question, the verdict line, and `Your call.`
+Before any pick, confirm, approve, prefer, accept, proceed, revisit, or stop turn, write the drafted question to `${RUN_DIR}/.q.md` and Claude's recommendation or neutral framing to `${RUN_DIR}/.r.md`; do not show it yet. Run the 2nd-opinion path, then show one message in this exact order:
+
+1. The question text from `.q.md`.
+2. Claude's recommendation or neutral framing from `.r.md`.
+3. A blank line, then the line `[Codex 2nd opinion]: <verdict>` (or `[Codex(fallback)] <verdict>` in MISSING mode).
+4. A blank line, then `Your call.`
+
+The Codex verdict must never appear before the question and recommendation. If you find yourself about to print the verdict first, stop and re-order.
 
 ### Inputs
 
@@ -184,7 +191,7 @@ bash scripts/build-opus-spec-review-prompt.sh "$RUN_DIR" "$REVIEW_ROUND" "$RUN_D
 
 ## Stage 5 — Handoff
 
-Copy the accepted canonical spec to `/tmp/claudex/${RUN_ID}/00-spec.md`, export `RUN_ID`, and ask the user whether to launch build inline or detached. The build-choice presentation is a user-decision-requesting turn, so run the second opinion before showing choices. The user must answer literal `1` or `2`; write it to `${RUN_DIR}/.user-build-choice`. Stage 5 dispatch order is: cp → 2nd-opinion → user-choice gate → probe-tmux → invoke.
+Copy the accepted canonical spec to `${HOME}/claudex-audits/${RUN_ID}/00-spec.md`, export `RUN_ID`, and ask the user whether to launch build inline or detached. The build-choice presentation is a user-decision-requesting turn, so run the second opinion before showing choices. The user must answer literal `1` or `2`; write it to `${RUN_DIR}/.user-build-choice`. Stage 5 dispatch order is: cp → 2nd-opinion → user-choice gate → probe-tmux → invoke.
 
 ### Inputs
 

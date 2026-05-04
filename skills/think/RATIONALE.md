@@ -6,7 +6,7 @@ Scripts own gates and append-only audit mutations because those behaviors need r
 
 ## Safety-rule inventory
 
-Design approval is mandatory before spec writing. Decisions freeze before Codex writes the spec. Duplicate transcript turns and decision IDs are refused. Build launch requires a literal user choice of `1` or `2`. The accepted spec is preserved in both destinations: the canonical docs path and `/tmp/claudex/${RUN_ID}/00-spec.md`.
+Design approval is mandatory before spec writing. Decisions freeze before Codex writes the spec. Duplicate transcript turns and decision IDs are refused. Build launch requires a literal user choice of `1` or `2`. The accepted spec is preserved in both destinations: the canonical docs path and `${HOME}/claudex-audits/${RUN_ID}/00-spec.md`.
 
 Maintainer note: the approved-design file is named `04-design.md` in `claudex:think` (was `.design.md` in `skills/brainstorming/`) so the file appears in audit listings instead of being hidden.
 

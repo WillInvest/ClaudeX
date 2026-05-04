@@ -47,7 +47,7 @@ trap 'rm -f "$PROMPT_FILE"' EXIT
 } > "$PROMPT_FILE"
 
 # Launch detached with a stable prompt path for stdin redirection.
-STABLE_PROMPT="/tmp/claudex/prompts/${RUN_ID}.prompt.md"
+STABLE_PROMPT="${HOME}/claudex-audits/prompts/${RUN_ID}.prompt.md"
 mkdir -p "$(dirname "$STABLE_PROMPT")"
 cp "$PROMPT_FILE" "$STABLE_PROMPT"
 
@@ -61,8 +61,8 @@ cat <<EOF
 [claudex] Build running in tmux session: ${SESSION_NAME}
   Attach:    tmux attach -t ${SESSION_NAME}
   Detach:    Ctrl-b d
-  Summary:   /tmp/claudex/${RUN_ID}/99-final-summary.md  (after build)
-  Audit:     /tmp/claudex/${RUN_ID}/
+  Summary:   ${HOME}/claudex-audits/${RUN_ID}/99-final-summary.md  (after build)
+  Audit:     ${HOME}/claudex-audits/${RUN_ID}/
   Kill:      tmux kill-session -t ${SESSION_NAME}
 
 Run-id: ${RUN_ID}

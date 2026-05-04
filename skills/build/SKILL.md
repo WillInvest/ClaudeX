@@ -1,13 +1,13 @@
 ---
 name: claudex-build
-description: Autonomous plan→implement pipeline invoked after a brainstorm has produced a spec. Codex (latest model, via `codex exec`) writes the plan and the implementation; a fresh Opus 4.7 subagent reviews each artifact for DRIFT (faithfulness to source) and QUALITY (Minimal / Consistent / Verifiable); orchestrator (main Claude) decides convergence per the canonical loop. Use after the claudex-brainstorming skill has produced a spec; user typically invokes via `/claudex-build` or by being handed off from claudex-brainstorming. Skips per-stage user gates by design — escalates only on hard blockers. Audit trail at `/tmp/claudex/<run-id>/`.
+description: Autonomous plan→implement pipeline invoked after a brainstorm has produced a spec. Codex (latest model, via `codex exec`) writes the plan and the implementation; a fresh Opus 4.7 subagent reviews each artifact for DRIFT (faithfulness to source) and QUALITY (Minimal / Consistent / Verifiable); orchestrator (main Claude) decides convergence per the canonical loop. Use after the claudex-brainstorming skill has produced a spec; user typically invokes via `/claudex-build` or by being handed off from claudex-brainstorming. Skips per-stage user gates by design — escalates only on hard blockers. Audit trail at `~/claudex-audits/<run-id>/`.
 ---
 
 # claudex-build — autonomous plan→impl pipeline
 
 ## Definition of done
 
-An approved plan + an implementation that passes review, both produced by Codex, judged by an independent Opus 4.7 reviewer, with a clean audit trail under `/tmp/claudex/<run-id>/`. The main session ends with at most a few short status lines, not a transcript of review traffic.
+An approved plan + an implementation that passes review, both produced by Codex, judged by an independent Opus 4.7 reviewer, with a clean audit trail under `~/claudex-audits/<run-id>/`. The main session ends with at most a few short status lines, not a transcript of review traffic.
 
 If the run finishes without that, the skill failed, even if code was written.
 
@@ -142,13 +142,13 @@ Identify the spec path (provided by the brainstorming handoff or by the user). C
 
 ```bash
 RUN_ID="${RUN_ID:-$(date -u +%Y-%m-%d-%H%M)-<slug>}"
-mkdir -p /tmp/claudex/$RUN_ID
-cp <spec-path> /tmp/claudex/$RUN_ID/00-spec.md
+mkdir -p ${HOME}/claudex-audits/$RUN_ID
+cp <spec-path> ${HOME}/claudex-audits/$RUN_ID/00-spec.md
 ```
 
 ### 1b. Build the plan prompt
 
-The fixed-skeleton prompt is in `plan-codex-prompt.md` in this skill directory. Read it, fill the adaptive `[ADAPTIVE]` block (project context — existing patterns from CLAUDE.md, files most relevant, any clarifications from the brainstorm not in the spec), and write to `/tmp/claudex/$RUN_ID/10-plan-prompt.md`.
+The fixed-skeleton prompt is in `plan-codex-prompt.md` in this skill directory. Read it, fill the adaptive `[ADAPTIVE]` block (project context — existing patterns from CLAUDE.md, files most relevant, any clarifications from the brainstorm not in the spec), and write to `${HOME}/claudex-audits/$RUN_ID/10-plan-prompt.md`.
 
 The adaptive section is REFERENCE MATERIAL ONLY. Do not editorialize, do not add instructions, do not tell Codex what to do beyond what the fixed skeleton already says.
 
@@ -158,9 +158,9 @@ The adaptive section is REFERENCE MATERIAL ONLY. Do not editorialize, do not add
 codex exec \
   --sandbox read-only \
   --skip-git-repo-check \
-  -C /tmp/claudex/$RUN_ID \
-  - < /tmp/claudex/$RUN_ID/10-plan-prompt.md \
-  > /tmp/claudex/$RUN_ID/11-plan-r1.md \
+  -C ${HOME}/claudex-audits/$RUN_ID \
+  - < ${HOME}/claudex-audits/$RUN_ID/10-plan-prompt.md \
+  > ${HOME}/claudex-audits/$RUN_ID/11-plan-r1.md \
   2>&1
 ```
 
@@ -182,10 +182,10 @@ Save the reviewer's response as `13-plan-r1-review.md`.
 If round 1 verdict is `re-review-needed`, build `14-plan-r2-prompt.md` containing the round-1 review items + the previous plan, and resume the codex session:
 
 ```bash
-( cd /tmp/claudex/$RUN_ID && \
+( cd ${HOME}/claudex-audits/$RUN_ID && \
   codex exec resume --last \
-    - < /tmp/claudex/$RUN_ID/14-plan-r2-prompt.md \
-    > /tmp/claudex/$RUN_ID/15-plan-r2.md \
+    - < ${HOME}/claudex-audits/$RUN_ID/14-plan-r2-prompt.md \
+    > ${HOME}/claudex-audits/$RUN_ID/15-plan-r2.md \
     2>&1 )
 ```
 
@@ -199,7 +199,7 @@ A `fix-and-proceed` follow-up dispatch (round 1 or round 2 final fix) uses the s
 
 ### 2a. Build the implementation prompt
 
-The fixed-skeleton prompt is in `impl-codex-prompt.md`. Read it, fill the adaptive `[ADAPTIVE]` block (project context + any plan-execution gotchas Claude noticed during plan review), and write to `/tmp/claudex/$RUN_ID/20-impl-prompt.md`.
+The fixed-skeleton prompt is in `impl-codex-prompt.md`. Read it, fill the adaptive `[ADAPTIVE]` block (project context + any plan-execution gotchas Claude noticed during plan review), and write to `${HOME}/claudex-audits/$RUN_ID/20-impl-prompt.md`.
 
 Derive the "Files you MAY modify" list from the approved plan. Derive the "Files explicitly OUT of scope" list from the plan's out-of-scope confirmation section.
 
@@ -211,16 +211,16 @@ Implementation needs write access — use `workspace-write`. Run inside the targ
 codex exec \
   --sandbox workspace-write \
   -C <repo-root> \
-  - < /tmp/claudex/$RUN_ID/20-impl-prompt.md \
-  > /tmp/claudex/$RUN_ID/21-impl-r1.log \
+  - < ${HOME}/claudex-audits/$RUN_ID/20-impl-prompt.md \
+  > ${HOME}/claudex-audits/$RUN_ID/21-impl-r1.log \
   2>&1
 ```
 
 Capture the diff for review:
 
 ```bash
-( cd <repo-root> && git diff --stat ) > /tmp/claudex/$RUN_ID/21-impl-r1.stat
-( cd <repo-root> && git diff )        > /tmp/claudex/$RUN_ID/21-impl-r1.diff
+( cd <repo-root> && git diff --stat ) > ${HOME}/claudex-audits/$RUN_ID/21-impl-r1.stat
+( cd <repo-root> && git diff )        > ${HOME}/claudex-audits/$RUN_ID/21-impl-r1.diff
 ```
 
 Sanity-check before dispatching the reviewer:
@@ -246,8 +246,8 @@ Round 2 prompt (`23-impl-r2-prompt.md`) references the round-1 diff and review. 
 ```bash
 ( cd <repo-root> && \
   codex exec resume --last --full-auto \
-    - < /tmp/claudex/$RUN_ID/23-impl-r2-prompt.md \
-    > /tmp/claudex/$RUN_ID/24-impl-r2.log \
+    - < ${HOME}/claudex-audits/$RUN_ID/23-impl-r2-prompt.md \
+    > ${HOME}/claudex-audits/$RUN_ID/24-impl-r2.log \
     2>&1 )
 ```
 
@@ -283,7 +283,7 @@ Options:
 3. <revise scope to Y>
 4. <abort>
 
-Audit trail: /tmp/claudex/<run-id>/
+Audit trail: ~/claudex-audits/<run-id>/
 ```
 
 Wait for the user's response. Silence is not approval.
@@ -300,14 +300,14 @@ After Stage 2:
 
 ```
 [claudex-build] IMPLEMENT: round <N> verdict=<v>. <K> files changed, tests <pass/fail>. Done.
-Audit trail: /tmp/claudex/<run-id>/
+Audit trail: ~/claudex-audits/<run-id>/
 ```
 
 If you proceeded with deferred items (`fix-and-proceed` after round 2 with remaining IMPORTANT or SUGGESTIONS), include a one-line `deferred:` note pointing at the review file.
 
 ## Audit trail layout
 
-Everything lives under `/tmp/claudex/<run-id>/`:
+Everything lives under `~/claudex-audits/<run-id>/`:
 
 ```
 00-spec.md
