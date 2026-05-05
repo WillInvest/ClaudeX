@@ -1,6 +1,6 @@
 ---
 name: claudex-build
-description: Autonomous plan→implement pipeline invoked after a brainstorm has produced a spec. Codex (latest model, via `codex exec`) writes the plan and the implementation; a fresh Opus 4.7 subagent reviews each artifact for DRIFT (faithfulness to source) and QUALITY (Minimal / Consistent / Verifiable); orchestrator (main Claude) decides convergence per the canonical loop. Use after the claudex-brainstorming skill has produced a spec; user typically invokes via `/claudex-build` or by being handed off from claudex-brainstorming. Skips per-stage user gates by design — escalates only on hard blockers. Audit trail at `~/vault/projects/claudex/audits/<run-id>/`.
+description: Autonomous plan→implement pipeline invoked after a design pass has produced a spec. Codex (latest model, via `codex exec`) writes the plan and the implementation; a fresh Opus 4.7 subagent reviews each artifact for DRIFT (faithfulness to source) and QUALITY (Minimal / Consistent / Verifiable); orchestrator (main Claude) decides convergence per the canonical loop. Use after the claudex:think skill has produced a spec; user typically invokes via `/claudex:build` or by being handed off from claudex:think. Skips per-stage user gates by design — escalates only on hard blockers. Audit trail at `~/vault/projects/claudex/audits/<run-id>/`.
 ---
 
 # claudex-build — autonomous plan→impl pipeline
@@ -13,7 +13,7 @@ If the run finishes without that, the skill failed, even if code was written.
 
 ## When this skill applies
 
-Invoke after a brainstorm has produced a spec — typically via the claudex-brainstorming skill, which hands off here automatically. The skill is right when:
+Invoke after a design pass has produced a spec — typically via the claudex:think skill, which hands off here automatically. The skill is right when:
 
 - The feature is non-trivial (multi-file, ≥ a few hours of work).
 - A spec exists and you can locate its path.
@@ -116,7 +116,7 @@ def run_stage(stage):                       # stage in {"plan", "implement"}
 The full pipeline:
 
 ```
-spec (locate via path provided by claudex-brainstorming or user)
+spec (locate via path provided by claudex:think or user)
    │
    ▼
 run_stage("plan")        ← max 2 reviews + at most 1 follow-up fix
@@ -138,7 +138,7 @@ final summary in main session, pointer to audit trail
 
 ### 1a. Locate the spec, set up audit trail
 
-Identify the spec path (provided by the brainstorming handoff or by the user). Compute `<run-id>` as `YYYY-MM-DD-HHMM-<slug>` where `<slug>` is a short kebab-case summary of the goal.
+Identify the spec path (provided by the claudex:think handoff or by the user). Compute `<run-id>` as `YYYY-MM-DD-HHMM-<slug>` where `<slug>` is a short kebab-case summary of the goal.
 
 ```bash
 RUN_ID="${RUN_ID:-$(date -u +%Y-%m-%d-%H%M)-<slug>}"
