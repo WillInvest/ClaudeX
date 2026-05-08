@@ -95,7 +95,16 @@ bash scripts/record-decision.sh "$RUN_DIR" "$DECISION_ID" "$DECISION_FILE" ${AUT
 
 ## Stage 2 — Approaches
 
-Prepare `05-approaches.md` with 2-3 viable approaches scaled to the problem, attribution for any model-sourced recommendation, and Claude's current pick. Approach selection is a user-decision-requesting turn, so the Stage 1 2nd-opinion rule applies before showing options, including the auto-mode sentinel check, safe auto-record cases, halt cases, canonical halt block, and metadata flags.
+Prepare `05-approaches.md` with 2-3 viable approaches scaled to the problem, attribution for any model-sourced recommendation, and Claude's current pick. Approach selection is a user-decision-requesting turn, so run the second opinion before showing options.
+
+Auto mode is active only when `${RUN_DIR}/.mode-auto` exists. Before showing the user-decision block, auto-record and continue only on `AGREE` with `--decided-by auto --foldability n/a --high-blast no`, or on `ANGLE-MISSED` when the angle is folded without changing the structural answer, using `--decided-by auto --foldability folded --high-blast no`. Halt and show this canonical halt block on `DISAGREE`, structural `ANGLE-MISSED`, Codex failure, unparsable verdicts, high-blast decisions, or ambiguous touched-file sets:
+`Auto mode halted.`
+`Reason: <halt reason>.`
+`Review the Codex 2nd opinion above.`
+`Choose Claude, Codex, revise, or stop.`
+`Your call.`
+
+If Claude's recommendation lacks explicit paths and the touched-file set is ambiguous, halt conservatively. After user resolution, record `--decided-by user --foldability n/a --high-blast ambiguous-halted`; for other halt resolutions, record `--decided-by user`, `--foldability structural` only for structural missed angles or `n/a` otherwise, and `--high-blast yes` for high-blast or `no` otherwise. Never remove `${RUN_DIR}/.mode-auto`.
 
 ### Dispatch
 
@@ -117,7 +126,18 @@ bash scripts/record-decision.sh "$RUN_DIR" "$DECISION_ID" "$DECISION_FILE" ${AUT
 
 ## Stage 3 — Design
 
-Write the design in sections sized to the task: problem, success criteria, selected approach, architecture, components, data flow, error handling, testing, and out of scope. Each section approval is a user-decision-requesting turn; run the second opinion before showing the approval request. Apply the Stage 1 auto-mode sentinel check at every per-section approval gate: auto-record only `AGREE` and folded `ANGLE-MISSED`, halt on disagreement, structural missed angles, Codex failure, unparsable verdicts, high-blast decisions, or ambiguous touched-file sets, and use the same metadata flags. After final approval, create `${RUN_DIR}/.design-approved`, then immediately freeze decisions with `scripts/freeze-decisions.sh`, which writes `${RUN_DIR}/03-decisions.frozen`.
+Write the design in sections sized to the task: problem, success criteria, selected approach, architecture, components, data flow, error handling, testing, and out of scope. Each section approval is a user-decision-requesting turn; run the second opinion before showing the approval request.
+
+Auto mode is active only when `${RUN_DIR}/.mode-auto` exists. Before showing the user-decision block, auto-record and continue only on `AGREE` with `--decided-by auto --foldability n/a --high-blast no`, or on `ANGLE-MISSED` when the angle is folded without changing the structural answer, using `--decided-by auto --foldability folded --high-blast no`. Halt and show this canonical halt block on `DISAGREE`, structural `ANGLE-MISSED`, Codex failure, unparsable verdicts, high-blast decisions, or ambiguous touched-file sets:
+`Auto mode halted.`
+`Reason: <halt reason>.`
+`Review the Codex 2nd opinion above.`
+`Choose Claude, Codex, revise, or stop.`
+`Your call.`
+
+If Claude's recommendation lacks explicit paths and the touched-file set is ambiguous, halt conservatively. After user resolution, record `--decided-by user --foldability n/a --high-blast ambiguous-halted`; for other halt resolutions, record `--decided-by user`, `--foldability structural` only for structural missed angles or `n/a` otherwise, and `--high-blast yes` for high-blast or `no` otherwise. Never remove `${RUN_DIR}/.mode-auto`.
+
+After final approval, create `${RUN_DIR}/.design-approved`, then immediately freeze decisions with `scripts/freeze-decisions.sh`, which writes `${RUN_DIR}/03-decisions.frozen`.
 
 ### Dispatch
 
