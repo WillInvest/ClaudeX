@@ -11,7 +11,7 @@ Every user-decision-requesting turn requires a 2nd-opinion dispatch before showi
 
 ## Stage 0 — Setup
 
-Create `RUN_ID="$(date -u +%Y-%m-%d-%H%M)-<slug>"`, resolve `RUN_DIR` with `../build/scripts/resolve-run-dir.sh`, and initialize `00-setup.md` and `03-decisions.md`; use a short kebab-case slug from the user's goal. Do not initialize `02-transcript.md`.
+Create `RUN_ID="${RUN_ID:-$(date -u +%Y-%m-%d-%H%M)-<slug>}"`, resolve `RUN_DIR="${RUN_DIR:-$(bash ../build/scripts/resolve-run-dir.sh "$RUN_ID")}"`, and initialize `00-setup.md` and `03-decisions.md`; use a short kebab-case slug from the user's goal when `RUN_ID` is not inherited. Do not initialize `02-transcript.md`.
 
 Resolved run paths:
 
@@ -37,7 +37,8 @@ Resolve `CANONICAL_SPEC_PATH` once at Stage 0 using the existing project-relativ
 ### Dispatch
 
 ```bash
-RUN_DIR="$(bash ../build/scripts/resolve-run-dir.sh "$RUN_ID")"
+RUN_ID="${RUN_ID:-$(date -u +%Y-%m-%d-%H%M)-<slug>}"
+RUN_DIR="${RUN_DIR:-$(bash ../build/scripts/resolve-run-dir.sh "$RUN_ID")}"
 mkdir -p "$RUN_DIR"
 : > "$RUN_DIR/00-setup.md"
 : > "$RUN_DIR/03-decisions.md"
@@ -62,12 +63,21 @@ Ask one focused question at a time. Append decisions immediately when made. Pure
 
 Before any pick, confirm, approve, prefer, accept, proceed, revisit, or stop turn, write the drafted question to `${RUN_DIR}/.q.md` and Claude's recommendation or neutral framing to `${RUN_DIR}/.r.md`; do not show it yet. Project CXMem main rounds into the transcript slot, run the 2nd-opinion path, then show one message in this exact order: question, recommendation/framing, blank line, `[Codex 2nd opinion]: <verdict>`, blank line, `Your call.`
 
+Auto mode is active only when `${RUN_DIR}/.mode-auto` exists. Before showing the user-decision block, auto-record and continue only on `AGREE` with `--decided-by auto --foldability n/a --high-blast no`, or on `ANGLE-MISSED` when the angle is folded without changing the structural answer, using `--decided-by auto --foldability folded --high-blast no`. Halt and show this canonical halt block on `DISAGREE`, structural `ANGLE-MISSED`, Codex failure, unparsable verdicts, high-blast decisions, or ambiguous touched-file sets:
+`Auto mode halted.`
+`Reason: <halt reason>.`
+`Review the Codex 2nd opinion above.`
+`Choose Claude, Codex, revise, or stop.`
+`Your call.`
+
+If Claude's recommendation lacks explicit paths and the touched-file set is ambiguous, halt conservatively. After user resolution, record `--decided-by user --foldability n/a --high-blast ambiguous-halted`; for other halt resolutions, record `--decided-by user`, `--foldability structural` only for structural missed angles or `n/a` otherwise, and `--high-blast yes` for high-blast or `no` otherwise. Never remove `${RUN_DIR}/.mode-auto`.
+
 ### Dispatch
 
 ```bash
 bash scripts/cxmem-rounds-to-transcript.sh "${SESSIONS_ROOT:-${HOME}/CXMem/projects/<project>/sessions}" "$CXMEM_SESSION_SLUG" |
   bash scripts/dispatch-codex-2nd-opinion.sh "$RUN_DIR" "$RUN_DIR/.q.md" "$RUN_DIR/.r.md"
-bash scripts/record-decision.sh "$RUN_DIR" "$DECISION_ID" "$DECISION_FILE"
+bash scripts/record-decision.sh "$RUN_DIR" "$DECISION_ID" "$DECISION_FILE" ${AUTO_DECISION_FLAGS:-}
 ```
 
 ### Verdict → next step
@@ -85,7 +95,7 @@ bash scripts/record-decision.sh "$RUN_DIR" "$DECISION_ID" "$DECISION_FILE"
 
 ## Stage 2 — Approaches
 
-Prepare `05-approaches.md` with 2-3 viable approaches scaled to the problem, attribution for any model-sourced recommendation, and Claude's current pick. Approach selection is a user-decision-requesting turn, so the Stage 1 2nd-opinion rule applies before showing options.
+Prepare `05-approaches.md` with 2-3 viable approaches scaled to the problem, attribution for any model-sourced recommendation, and Claude's current pick. Approach selection is a user-decision-requesting turn, so the Stage 1 2nd-opinion rule applies before showing options, including the auto-mode sentinel check, safe auto-record cases, halt cases, canonical halt block, and metadata flags.
 
 ### Dispatch
 
@@ -93,7 +103,7 @@ Prepare `05-approaches.md` with 2-3 viable approaches scaled to the problem, att
 bash scripts/cxmem-rounds-to-transcript.sh "${SESSIONS_ROOT:-${HOME}/CXMem/projects/<project>/sessions}" "$CXMEM_SESSION_SLUG" |
   bash scripts/dispatch-codex-2nd-opinion.sh "$RUN_DIR" "$RUN_DIR/.q.md" "$RUN_DIR/.r.md"
 cat "$RUN_DIR/.approaches.md" > "$RUN_DIR/05-approaches.md"
-bash scripts/record-decision.sh "$RUN_DIR" "$DECISION_ID" "$DECISION_FILE"
+bash scripts/record-decision.sh "$RUN_DIR" "$DECISION_ID" "$DECISION_FILE" ${AUTO_DECISION_FLAGS:-}
 ```
 
 ### Verdict → next step
@@ -107,14 +117,14 @@ bash scripts/record-decision.sh "$RUN_DIR" "$DECISION_ID" "$DECISION_FILE"
 
 ## Stage 3 — Design
 
-Write the design in sections sized to the task: problem, success criteria, selected approach, architecture, components, data flow, error handling, testing, and out of scope. Each section approval is a user-decision-requesting turn; run the second opinion before showing the approval request. After final approval, create `${RUN_DIR}/.design-approved`, then immediately freeze decisions with `scripts/freeze-decisions.sh`, which writes `${RUN_DIR}/03-decisions.frozen`.
+Write the design in sections sized to the task: problem, success criteria, selected approach, architecture, components, data flow, error handling, testing, and out of scope. Each section approval is a user-decision-requesting turn; run the second opinion before showing the approval request. Apply the Stage 1 auto-mode sentinel check at every per-section approval gate: auto-record only `AGREE` and folded `ANGLE-MISSED`, halt on disagreement, structural missed angles, Codex failure, unparsable verdicts, high-blast decisions, or ambiguous touched-file sets, and use the same metadata flags. After final approval, create `${RUN_DIR}/.design-approved`, then immediately freeze decisions with `scripts/freeze-decisions.sh`, which writes `${RUN_DIR}/03-decisions.frozen`.
 
 ### Dispatch
 
 ```bash
 bash scripts/cxmem-rounds-to-transcript.sh "${SESSIONS_ROOT:-${HOME}/CXMem/projects/<project>/sessions}" "$CXMEM_SESSION_SLUG" |
   bash scripts/dispatch-codex-2nd-opinion.sh "$RUN_DIR" "$RUN_DIR/.q.md" "$RUN_DIR/.r.md"
-bash scripts/record-decision.sh "$RUN_DIR" "$DECISION_ID" "$DECISION_FILE"
+bash scripts/record-decision.sh "$RUN_DIR" "$DECISION_ID" "$DECISION_FILE" ${AUTO_DECISION_FLAGS:-}
 bash scripts/gate-design-approval.sh "$RUN_DIR"
 bash scripts/freeze-decisions.sh "$RUN_DIR"
 ```
@@ -171,7 +181,9 @@ bash scripts/build-opus-spec-review-prompt.sh "$RUN_DIR" "$REVIEW_ROUND" "$RUN_D
 
 ## Stage 5 — Handoff
 
-Copy the accepted canonical spec to `${RUN_DIR}/00-spec.md`, export `RUN_ID`, and ask the user whether to launch `/claudex:build` in detached tmux now. The build-choice presentation is a user-decision-requesting turn, so run the second opinion before showing choices. The user must answer yes or no; write it to `${RUN_DIR}/.user-build-choice`. On yes, export `RUN_ID`, `RUN_DIR`, `CANONICAL_SPEC_PATH`, `CXMEM_HOME`, `CXMEM_PROJECT`, `CXMEM_HOST_STATE`, `CXMEM_SESSION_SLUG`, `SESSIONS_ROOT`, and `MAIN_ROUND_SEQ`; `start-tmux-build.sh` launches exactly one detached session named `claudex-build-${CXMEM_PROJECT}-${RUN_ID}`.
+Copy the accepted canonical spec to `${RUN_DIR}/00-spec.md`, export `RUN_ID`, and decide whether to launch `/claudex:build` in detached tmux now. In auto mode, evaluate D15 before the user prompt: `mode_auto=yes` when `${RUN_DIR}/.mode-auto` exists, `no_user_decisions=yes` when `${RUN_DIR}/03-decisions.md` has no `Decided-by: user` rows, and `stage3_agree=yes` when the latest Stage 3 second-opinion verdict is `AGREE`. If all three are true, write `${RUN_DIR}/.auto-launch-decision`, append a Stage 5 auto decision row with `Decided-by: auto`, `Foldability: n/a`, `High-blast: no`, and invoke the existing `start-tmux-build.sh` path. If `${RUN_DIR}/.auto-launch-decision` cannot be written, treat `auto_launch=no`, append a decision body that captures the write-failure note, and continue to the legacy yes/no prompt.
+
+When D15 is false or auto-launch marker writing fails, keep the existing yes/no handoff behavior. The build-choice presentation is a user-decision-requesting turn, so run the second opinion before showing choices. The user must answer yes or no; write it to `${RUN_DIR}/.user-build-choice`. On yes, export `RUN_ID`, `RUN_DIR`, `CANONICAL_SPEC_PATH`, `CXMEM_HOME`, `CXMEM_PROJECT`, `CXMEM_HOST_STATE`, `CXMEM_SESSION_SLUG`, `SESSIONS_ROOT`, and `MAIN_ROUND_SEQ`; `start-tmux-build.sh` launches exactly one detached session named `claudex-build-${CXMEM_PROJECT}-${RUN_ID}`.
 
 ### Inputs
 
@@ -186,9 +198,24 @@ Copy the accepted canonical spec to `${RUN_DIR}/00-spec.md`, export `RUN_ID`, an
 
 ```bash
 cp "$CANONICAL_SPEC_PATH" "$RUN_DIR/00-spec.md"
-bash scripts/dispatch-codex-2nd-opinion.sh "$RUN_DIR" "$RUN_DIR/.q.md" "$RUN_DIR/.r.md"
-bash scripts/gate-user-build-choice.sh "$RUN_DIR"
-RUN_ID="$RUN_ID" RUN_DIR="$RUN_DIR" CANONICAL_SPEC_PATH="$CANONICAL_SPEC_PATH" CXMEM_HOME="${CXMEM_HOME:-}" CXMEM_PROJECT="${CXMEM_PROJECT:-}" CXMEM_HOST_STATE="${CXMEM_HOST_STATE:-}" CXMEM_SESSION_SLUG="${CXMEM_SESSION_SLUG:-}" SESSIONS_ROOT="${SESSIONS_ROOT:-}" MAIN_ROUND_SEQ="${MAIN_ROUND_SEQ:-}" bash scripts/start-tmux-build.sh
+if [[ -f "$RUN_DIR/.mode-auto" ]] && ! grep -q '^Decided-by: user$' "$RUN_DIR/03-decisions.md" && [[ "$LATEST_STAGE3_VERDICT" == AGREE ]]; then
+  if printf 'auto_launch=yes\nmode_auto=yes\nno_user_decisions=yes\nstage3_agree=yes\n' > "$RUN_DIR/.auto-launch-decision"; then
+    bash scripts/record-decision.sh "$RUN_DIR" "$DECISION_ID" "$DECISION_FILE" --decided-by auto --foldability n/a --high-blast no
+    RUN_ID="$RUN_ID" RUN_DIR="$RUN_DIR" CANONICAL_SPEC_PATH="$CANONICAL_SPEC_PATH" CXMEM_HOME="${CXMEM_HOME:-}" CXMEM_PROJECT="${CXMEM_PROJECT:-}" CXMEM_HOST_STATE="${CXMEM_HOST_STATE:-}" CXMEM_SESSION_SLUG="${CXMEM_SESSION_SLUG:-}" SESSIONS_ROOT="${SESSIONS_ROOT:-}" MAIN_ROUND_SEQ="${MAIN_ROUND_SEQ:-}" bash scripts/start-tmux-build.sh
+  else
+    AUTO_LAUNCH_WRITE_FAILED="failed to write $RUN_DIR/.auto-launch-decision"
+    printf '\nAuto-launch write failure: %s\n' "$AUTO_LAUNCH_WRITE_FAILED" >> "$DECISION_FILE"
+    bash scripts/record-decision.sh "$RUN_DIR" "$DECISION_ID" "$DECISION_FILE" --decided-by user --foldability n/a --high-blast no
+    bash scripts/dispatch-codex-2nd-opinion.sh "$RUN_DIR" "$RUN_DIR/.q.md" "$RUN_DIR/.r.md"
+    bash scripts/gate-user-build-choice.sh "$RUN_DIR"
+    RUN_ID="$RUN_ID" RUN_DIR="$RUN_DIR" CANONICAL_SPEC_PATH="$CANONICAL_SPEC_PATH" CXMEM_HOME="${CXMEM_HOME:-}" CXMEM_PROJECT="${CXMEM_PROJECT:-}" CXMEM_HOST_STATE="${CXMEM_HOST_STATE:-}" CXMEM_SESSION_SLUG="${CXMEM_SESSION_SLUG:-}" SESSIONS_ROOT="${SESSIONS_ROOT:-}" MAIN_ROUND_SEQ="${MAIN_ROUND_SEQ:-}" bash scripts/start-tmux-build.sh
+  fi
+else
+  printf 'auto_launch=no\nmode_auto=%s\nno_user_decisions=%s\nstage3_agree=%s\n' "${MODE_AUTO:-no}" "${NO_USER_DECISIONS:-no}" "${STAGE3_AGREE:-no}" > "$RUN_DIR/.auto-launch-decision" 2>/dev/null || true
+  bash scripts/dispatch-codex-2nd-opinion.sh "$RUN_DIR" "$RUN_DIR/.q.md" "$RUN_DIR/.r.md"
+  bash scripts/gate-user-build-choice.sh "$RUN_DIR"
+  RUN_ID="$RUN_ID" RUN_DIR="$RUN_DIR" CANONICAL_SPEC_PATH="$CANONICAL_SPEC_PATH" CXMEM_HOME="${CXMEM_HOME:-}" CXMEM_PROJECT="${CXMEM_PROJECT:-}" CXMEM_HOST_STATE="${CXMEM_HOST_STATE:-}" CXMEM_SESSION_SLUG="${CXMEM_SESSION_SLUG:-}" SESSIONS_ROOT="${SESSIONS_ROOT:-}" MAIN_ROUND_SEQ="${MAIN_ROUND_SEQ:-}" bash scripts/start-tmux-build.sh
+fi
 ```
 
 ### Verdict → next step

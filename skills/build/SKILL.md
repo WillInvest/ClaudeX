@@ -51,6 +51,8 @@ Each stage runs Codex round 1, Opus review round 1, optional Codex fix or round 
 
 Reviewer verdicts are parsed literally: `ready-to-execute`, `fix-and-proceed`, `re-review-needed`, `escalate`. Round 2 is final; `re-review-needed` or `escalate` after round 2 escalates to the user.
 
+When `${RUN_DIR}/.mode-auto` exists, apply the auto gate at every reviewer/implementer convergence decision before showing any user-decision block. Continue and append a convergence row through `~/.claude/plugins/claudex/skills/think/scripts/record-decision.sh` only on `AGREE` with `--decided-by auto --foldability n/a --high-blast no`, or on foldable `ANGLE-MISSED` with `--decided-by auto --foldability folded --high-blast no`. Halt without an auto-recorded convergence row on `DISAGREE`, structural `ANGLE-MISSED`, high-blast, Codex failure, or unparsable verdict; show the same canonical halt block used by `~/.claude/plugins/claudex/skills/think/SKILL.md`. Never remove `${RUN_DIR}/.mode-auto`.
+
 After every Codex exec in SPEC, PLAN, or IMPLEMENT:
 
 ```bash
