@@ -1,10 +1,12 @@
 # ClaudeX
 
-**Multi-model collaboration on top of [superpowers](https://github.com/obra/superpowers) — the official Claude Code plugin for harness flow.** ClaudeX adds Codex into the flow so Claude and Codex — two state-of-the-art models — cooperate inside the same loop. Codex gives a second opinion at every recommendation in brainstorming, then writes plan and implementation while Opus reviews — so drift gets caught even when no human reads the spec.
+**Dual-Model Harnessing OS: dual-model collaboration, persistent memory recording, and minimal context per prompt.**
 
----
+ClaudeX is the public face of a Dual-Model Harnessing OS: Claude and Codex work as independent peers instead of one model carrying the whole build. Claudex shipped today as step 1, adding dual-model collaboration to the `superpowers` flow and using a model gate when the user will not read every artifact. Step 2 is CXMem, now in progress, bringing persistent memory recording so prior rounds can be found without stuffing the whole history back into each prompt. The design constraint is simple: record the work continuously, then load minimal context per prompt.
 
-## Quick start
+## Today: Claudex (step 1)
+
+### Quick start
 
 In Claude Code:
 
@@ -36,7 +38,7 @@ To update later:
 /plugin update claudex
 ```
 
-## Why ClaudeX
+### How it runs
 
 `superpowers` is a great skill library, but its design assumes the **user reads the spec and the plan**. In practice almost no one does. That single-model loop has three drift points:
 
@@ -47,8 +49,6 @@ To update later:
 The intended drift defense is human review. The actual drift defense is hope.
 
 **ClaudeX replaces the missing human gate with a model gate.** Two models, different vendors, different inductive biases — Claude (Opus) and OpenAI Codex. They disagree on real things. Their disagreements catch real bugs.
-
-## How ClaudeX runs
 
 In `superpowers`, one model runs the whole pipeline (brainstorm → spec → plan → impl) and the user is expected to gate at the spec. ClaudeX makes the loop multi-actor: every recommendation gets a Codex second opinion, and every artifact (plan, impl) gets an independent Opus review.
 
@@ -93,7 +93,7 @@ sequenceDiagram
 - **Consistent** — does it follow the project's existing patterns (naming, error style, test structure, file organization)?
 - **Verifiable** — do the tests actually exercise the changed behavior? Would they fail if the implementation were wrong? Or are the assertions tautologies that pass against the artifact itself?
 
-## Side-by-side with plain `superpowers`
+### Side-by-side with plain superpowers
 
 | | superpowers | ClaudeX |
 |---|---|---|
@@ -106,7 +106,15 @@ sequenceDiagram
 | Drift defense if user skims | hope | model |
 | Cost | 1 model | 2 models, ~2× tokens at brainstorm peaks |
 
+## Next: CXMem (step 2)
 
+CXMem is in progress, not shipped as a stable public surface. It records every round under `~/CXMem/projects/<X>/`: the user prompt, assistant output, tool calls, and decisions, with indexed catch-up through `project-memory.md` plus active session drill-down.
+
+The public API is not stable, and this README intentionally avoids freezing a schema, slug protocol, or storage contract. We are dogfooding it under `claudex-imp` while the memory layer proves that persistent records can stay useful without making each prompt carry the whole project history.
+
+## Roadmap
+
+Future decisions are constrained by one north star: consistent memory recording across sessions plus minimal context loaded per prompt. Claudex handles the shipped dual-model harness today; CXMem is the next layer that should make the harness better at resuming, auditing, and staying small.
 
 ## Credits & license
 
