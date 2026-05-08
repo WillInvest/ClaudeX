@@ -1,0 +1,50 @@
+Codex work output before memory blocks.
+<<<CXMEM-RECORD>>>
+{
+  "version": 1,
+  "stage": "impl",
+  "round": 7,
+  "seq": 1,
+  "tool": "Read",
+  "plan": "Inspect existing conventions.",
+  "tool_summary": "Inspected conventions",
+  "findings": ["Found bash headers", "Found test runner shape"],
+  "next_plan": "Implement build scripts."
+}
+<<<END>>>
+<<<CXMEM-RECORD>>>
+{
+  "version": 1,
+  "stage": "impl",
+  "round": 7,
+  "seq": 2,
+  "tool": "Edit x 3",
+  "plan": "Create scripts and prompt.",
+  "tool_summary": "Created build foundation",
+  "findings": ["Added probe", "Added parser", "Added writer"],
+  "next_plan": "Verify with tests."
+}
+<<<END>>>
+<<<CXMEM-RECORD>>>
+{
+  "version": 1,
+  "stage": "impl",
+  "round": 7,
+  "seq": 3,
+  "tool": "Bash",
+  "plan": "Run verification.",
+  "tool_summary": "Ran build tests",
+  "findings": ["Parser and writer integrated"],
+  "next_plan": "Report results."
+}
+<<<END>>>
+<<<CXMEM-INDEX version="1">>>
+| ID | Summary | Source |
+|---|---|---|
+| 7.1 | Inspected conventions | Codex log |
+| 7.2 | Created build foundation | Codex log |
+| 7.3 | Ran build tests | Codex log |
+<<<END>>>
+<<<CXMEM-SUMMARY version="1">>>
+Codex emitted three structured records for the build foundation.
+<<<END>>>

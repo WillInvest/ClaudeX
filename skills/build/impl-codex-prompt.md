@@ -37,3 +37,7 @@ These are tempting to "clean up" — do not. If you spot a bug or refactor oppor
 1. **[Minimal]** — could this diff be materially smaller (fewer files, fewer abstractions, fewer helpers) without losing information? Don't add scaffolding the plan didn't ask for.
 2. **[Consistent]** — does the code match the project's existing patterns (naming, error style, test structure, file organization)?
 3. **[Verifiable]** — do the tests actually exercise the changed behavior? Would they fail if the change were wrong?
+
+# CXMem recording rule (spliced when host-ready)
+
+{{recording_rule_block}}

@@ -1,68 +1,78 @@
 #!/usr/bin/env bash
-# Launches /claudex:build for SPEC_PATH inside a detached tmux session.
-# Prints the session name and operating instructions to stdout.
-# Usage: start-tmux-build.sh <spec-path> [run-id]
+# Launches /claudex:build in a detached tmux session using handoff env vars.
+# Usage: RUN_ID=<id> RUN_DIR=<dir> CANONICAL_SPEC_PATH=<path> start-tmux-build.sh
+#
+# Reads:
+#   RUN_ID
+#   RUN_DIR
+#   CANONICAL_SPEC_PATH
+#   CXMEM_PROJECT
+# Writes:
+#   ${RUN_DIR}/.tmux-prompt.md
+# Stdout:
+#   tmux attach instructions
+# Exit:
+#   0 launched
+#   2 usage / missing-file
+#   3 tmux or claude missing from PATH
+#   4 tmux session creation failed
 set -euo pipefail
 
-SPEC_PATH="${1:?usage: start-tmux-build.sh <spec-path> [run-id]}"
-INHERITED_RUN_ID="${2:-}"
-[[ -f "$SPEC_PATH" ]] || { echo "error: spec not found: $SPEC_PATH" >&2; exit 1; }
-command -v tmux >/dev/null || { echo "error: tmux not on PATH" >&2; exit 1; }
-command -v claude >/dev/null || { echo "error: claude CLI not on PATH" >&2; exit 1; }
+[[ "$#" -eq 0 ]] || { echo "error: usage: RUN_ID=<id> RUN_DIR=<dir> CANONICAL_SPEC_PATH=<path> start-tmux-build.sh" >&2; exit 2; }
 
-# Derive slug from spec basename.
-spec_base="$(basename "$SPEC_PATH" .md)"
-# Match brainstorming spec filenames: YYYY-MM-DD-<topic>-design.md -> <topic>.
-slug="$(echo "$spec_base" \
-  | sed -E 's/^[0-9]{4}-[0-9]{2}-[0-9]{2}-//' \
-  | sed -E 's/-design$//')"
+RUN_ID="${RUN_ID:-}"
+RUN_DIR="${RUN_DIR:-}"
+CANONICAL_SPEC_PATH="${CANONICAL_SPEC_PATH:-}"
 
-# Compute run-id and tmux session name.
-if [[ -n "$INHERITED_RUN_ID" ]]; then
-  RUN_ID="$INHERITED_RUN_ID"
-else
-  RUN_ID="$(date -u +%Y-%m-%d-%H%M)-${slug}"
+[[ -n "$RUN_ID" ]] || { echo "error: RUN_ID is required" >&2; exit 2; }
+[[ -n "$RUN_DIR" ]] || { echo "error: RUN_DIR is required" >&2; exit 2; }
+[[ -n "$CANONICAL_SPEC_PATH" ]] || { echo "error: CANONICAL_SPEC_PATH is required" >&2; exit 2; }
+[[ -d "$RUN_DIR" ]] || { echo "error: RUN_DIR not found: $RUN_DIR" >&2; exit 2; }
+[[ -f "$CANONICAL_SPEC_PATH" ]] || { echo "error: canonical spec not found: $CANONICAL_SPEC_PATH" >&2; exit 2; }
+
+if ! command -v tmux >/dev/null; then
+  echo "error: tmux not on PATH; install with: sudo apt install tmux  # Debian/Ubuntu; brew install tmux  # macOS" >&2
+  exit 3
 fi
-HMS="$(date +%H%M%S)"
-SESSION_NAME="claudex-build-${slug}-${HMS}"
+if ! command -v claude >/dev/null; then
+  echo "error: claude CLI not on PATH" >&2
+  exit 3
+fi
 
-# Collision guard: if SESSION_NAME already exists, append -2, -3, ...
-n=2
-while tmux has-session -t "$SESSION_NAME" 2>/dev/null; do
-  SESSION_NAME="claudex-build-${slug}-${HMS}-${n}"
-  n=$((n+1))
-done
-
-# Build the prompt as a tmpfile (no shell substitution into tmux command).
-PROMPT_FILE="$(mktemp -t claudex-prompt.XXXXXX)"
-trap 'rm -f "$PROMPT_FILE"' EXIT
+CXMEM_PROJECT_TOKEN="${CXMEM_PROJECT:-unknown-project}"
+SESSION_NAME="claudex-build-${CXMEM_PROJECT_TOKEN}-${RUN_ID}"
+STABLE_PROMPT="$RUN_DIR/.tmux-prompt.md"
 
 {
-  printf '/claudex:build %s\n' "$SPEC_PATH"
+  printf '/claudex:build %s\n' "$CANONICAL_SPEC_PATH"
   HOOK="$HOME/.claude/claudex/post-build-hook.md"
   if [[ -s "$HOOK" ]]; then
     printf '\n--- post-build hook (%s) ---\n' "$HOOK"
     cat "$HOOK"
   fi
-} > "$PROMPT_FILE"
+} > "$STABLE_PROMPT"
 
-# Launch detached with a stable prompt path for stdin redirection.
-STABLE_PROMPT="${HOME}/vault/projects/claudex/audits/prompts/${RUN_ID}.prompt.md"
-mkdir -p "$(dirname "$STABLE_PROMPT")"
-cp "$PROMPT_FILE" "$STABLE_PROMPT"
-
-# bypassPermissions is required for unattended detached runs — `auto` and
-# `acceptEdits` still raise interactive prompts (reads outside cwd, network,
-# MCP tools), and there is no user attached to answer them.
-tmux new-session -d -s "$SESSION_NAME" \
-  "RUN_ID='${RUN_ID}' claude --permission-mode bypassPermissions < '${STABLE_PROMPT}' ; exec bash"
+if ! tmux new-session -d -s "$SESSION_NAME" \
+  -e "RUN_ID=$RUN_ID" \
+  -e "RUN_DIR=$RUN_DIR" \
+  -e "CANONICAL_SPEC_PATH=$CANONICAL_SPEC_PATH" \
+  -e "CXMEM_HOME=${CXMEM_HOME:-}" \
+  -e "CXMEM_PROJECT=${CXMEM_PROJECT:-}" \
+  -e "CXMEM_HOST_STATE=${CXMEM_HOST_STATE:-}" \
+  -e "CXMEM_SESSION_SLUG=${CXMEM_SESSION_SLUG:-}" \
+  -e "SESSIONS_ROOT=${SESSIONS_ROOT:-}" \
+  -e "MAIN_ROUND_SEQ=${MAIN_ROUND_SEQ:-}" \
+  "claude --permission-mode bypassPermissions < '$STABLE_PROMPT' ; exec bash"; then
+  echo "error: failed to create tmux session: $SESSION_NAME" >&2
+  exit 4
+fi
 
 cat <<EOF
 [claudex] Build running in tmux session: ${SESSION_NAME}
   Attach:    tmux attach -t ${SESSION_NAME}
   Detach:    Ctrl-b d
-  Summary:   ${HOME}/vault/projects/claudex/audits/${RUN_ID}/99-final-summary.md  (after build)
-  Audit:     ${HOME}/vault/projects/claudex/audits/${RUN_ID}/
+  Summary:   ${RUN_DIR}/99-final-summary.md  (after build)
+  Run trail: ${RUN_DIR}/
   Kill:      tmux kill-session -t ${SESSION_NAME}
 
 Run-id: ${RUN_ID}

@@ -1,14 +1,13 @@
 #!/usr/bin/env bash
-# Dispatches Codex to write the brainstorm spec for a given round.
+# Dispatches Codex to write the build SPEC artifact for a given round.
 # Usage: dispatch-codex-spec-write.sh <run-dir> <round> <design-file> <approaches-file> <canonical-spec-path>
 #   round: 1 | 2 | fix1 | fix2
 #
 # Reads:
-#   <run-dir>/02-transcript.md
 #   <run-dir>/03-decisions.md      (FROZEN at this point)
 #   <approaches-file>              typically <run-dir>/05-approaches.md
 #   <design-file>                  the agreed design markdown
-#   ../spec-codex-prompt.md        template, slots: TRANSCRIPT/DECISIONS/APPROACHES/DESIGN
+#   ../spec-codex-prompt.md        template, slots: DECISIONS/APPROACHES/DESIGN/CANONICAL_SPEC_PATH/adaptive_context/recording_rule_block
 #
 # Writes:
 #   <run-dir>/spec-prompt-r<round>.md   filled prompt
@@ -46,7 +45,6 @@ case "$ROUND" in
 esac
 
 [[ -d "$RUN_DIR" ]]                              || { echo "error: run dir not found: $RUN_DIR" >&2;       exit 2; }
-[[ -f "$RUN_DIR/02-transcript.md" ]]             || { echo "error: transcript missing" >&2;                exit 2; }
 [[ -f "$RUN_DIR/03-decisions.md" ]]              || { echo "error: decisions missing" >&2;                 exit 2; }
 [[ -f "$APPROACHES_FILE" ]]                      || { echo "error: approaches not found: $APPROACHES_FILE" >&2; exit 2; }
 [[ -f "$DESIGN_FILE" ]]                          || { echo "error: design not found: $DESIGN_FILE" >&2;    exit 2; }
@@ -57,17 +55,26 @@ TEMPLATE="$SCRIPT_DIR/../spec-codex-prompt.md"
 
 # Build the round prompt via python.
 PROMPT_FILE="$RUN_DIR/spec-prompt-r${ROUND}.md"
-python3 - "$TEMPLATE" "$RUN_DIR/02-transcript.md" "$RUN_DIR/03-decisions.md" "$APPROACHES_FILE" "$DESIGN_FILE" > "$PROMPT_FILE" <<'PY'
+RECORDING_RULE_BLOCK=""
+if [[ "${CXMEM_HOST_STATE:-}" == "CXMEM_HOST_PROJECT_READY" ]]; then
+  RECORDING_RULE_PATH="$SCRIPT_DIR/../prompts/cxmem-recording-rule-block.md"
+  [[ -f "$RECORDING_RULE_PATH" ]] || { echo "error: recording rule missing: $RECORDING_RULE_PATH" >&2; exit 2; }
+  RECORDING_RULE_BLOCK="$(cat "$RECORDING_RULE_PATH")"
+fi
+
+python3 - "$TEMPLATE" "$RUN_DIR/03-decisions.md" "$APPROACHES_FILE" "$DESIGN_FILE" "$CANONICAL_PATH" "${ADAPTIVE_CONTEXT_PATH:-}" "$RECORDING_RULE_BLOCK" > "$PROMPT_FILE" <<'PY'
 import sys
-template, t_path, d_path, a_path, des_path = sys.argv[1:]
+template, d_path, a_path, des_path, canonical_path, adaptive_path, recording_rule = sys.argv[1:]
 def read(p):
     with open(p, 'r', encoding='utf-8') as f:
         return f.read()
 text = read(template)
-text = text.replace('{{TRANSCRIPT}}',  read(t_path))
 text = text.replace('{{DECISIONS}}',   read(d_path))
 text = text.replace('{{APPROACHES}}',  read(a_path))
 text = text.replace('{{DESIGN}}',      read(des_path))
+text = text.replace('{{CANONICAL_SPEC_PATH}}', canonical_path)
+text = text.replace('{{adaptive_context}}', read(adaptive_path) if adaptive_path else "none")
+text = text.replace('{{recording_rule_block}}', recording_rule)
 sys.stdout.write(text)
 PY
 
@@ -126,11 +133,14 @@ decisions = open(decisions_path, 'r', encoding='utf-8').read().strip()
 # decisions content. The codex prompt instructs codex to leave this section
 # empty; the splice happens here regardless.
 def replace_preamble(spec_text, decisions_text):
-    pat = re.compile(r'(?ms)^(## Decisions preamble[ \t]*\n)(.*?)(?=^## )')
+    # Boundary lookahead skips past '## Decision *' headers so the spliced
+    # decisions block (whose entries themselves start with '## Decision Dn-...')
+    # does not terminate the section prematurely.
+    pat = re.compile(r'(?ms)^(## Decisions preamble[ \t]*\n)(.*?)(?=^## (?!Decision\b))')
     repl = lambda mm: mm.group(1) + '\n' + decisions_text + '\n\n'
     new_text, n = pat.subn(repl, spec_text, count=1)
     if n != 1:
-        sys.stderr.write("error: '## Decisions preamble' header not found exactly once before next '## '\n")
+        sys.stderr.write("error: '## Decisions preamble' header not found exactly once before next non-decision '## '\n")
         sys.exit(2)
     return new_text
 
@@ -148,7 +158,7 @@ import sys, re, difflib
 spec_path, decisions_path = sys.argv[1:]
 spec = open(spec_path, 'r', encoding='utf-8').read()
 expected = open(decisions_path, 'r', encoding='utf-8').read().strip()
-m = re.search(r'(?m)^## Decisions preamble\s*\n(.*?)(?=^## )', spec, flags=re.DOTALL)
+m = re.search(r'(?m)^## Decisions preamble\s*\n(.*?)(?=^## (?!Decision\b))', spec, flags=re.DOTALL)
 if not m:
     sys.stderr.write("preamble section missing after splice\n")
     sys.exit(1)

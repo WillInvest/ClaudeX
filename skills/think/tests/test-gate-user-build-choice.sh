@@ -10,28 +10,28 @@ set +e
 bash "$SCRIPT" >"$TMP/usage-out" 2>"$TMP/usage-err"
 usage_status=$?
 set -e
-if [[ "$usage_status" -ne 2 ]]; then
-  echo "FAIL: usage error exited $usage_status, expected 2"
-  exit 1
-fi
+[[ "$usage_status" -eq 2 ]] || { echo "FAIL: usage error exited $usage_status, expected 2"; exit 1; }
 
-for bad in missing 3 "1 2" " 1" "yes"; do
+for bad in missing 1 2 "y n" maybe " yes"; do
   rm -f "$TMP/.user-build-choice"
   [[ "$bad" == "missing" ]] || printf '%s\n' "$bad" > "$TMP/.user-build-choice"
   set +e
   bash "$SCRIPT" "$TMP" >"$TMP/out" 2>"$TMP/err"
   status=$?
   set -e
-  if [[ "$status" -ne 3 ]]; then
-    echo "FAIL: expected exit 3 for choice '$bad', got $status"
-    exit 1
-  fi
+  [[ "$status" -eq 3 ]] || { echo "FAIL: expected exit 3 for choice '$bad', got $status"; exit 1; }
 done
 
-printf '1\n' > "$TMP/.user-build-choice"
-[[ "$(bash "$SCRIPT" "$TMP")" == "USER_BUILD_CHOICE_1" ]]
+printf 'y\n' > "$TMP/.user-build-choice"
+[[ "$(bash "$SCRIPT" "$TMP")" == "USER_BUILD_YES" ]]
 
-printf '2   \n' > "$TMP/.user-build-choice"
-[[ "$(bash "$SCRIPT" "$TMP")" == "USER_BUILD_CHOICE_2" ]]
+printf 'YES   \n' > "$TMP/.user-build-choice"
+[[ "$(bash "$SCRIPT" "$TMP")" == "USER_BUILD_YES" ]]
 
-echo "PASS: gate-user-build-choice literal choices only"
+printf 'n\n' > "$TMP/.user-build-choice"
+[[ "$(bash "$SCRIPT" "$TMP")" == "USER_BUILD_NO" ]]
+
+printf 'No   \n' > "$TMP/.user-build-choice"
+[[ "$(bash "$SCRIPT" "$TMP")" == "USER_BUILD_NO" ]]
+
+echo "PASS: gate-user-build-choice accepts yes/no only"

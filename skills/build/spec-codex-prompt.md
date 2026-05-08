@@ -1,8 +1,4 @@
-You are Codex, the spec writer for a claudex brainstorm.
-
-# TRANSCRIPT
-
-{{TRANSCRIPT}}
+You are Codex, the spec writer for an approved claudex design.
 
 # DECISIONS
 
@@ -16,9 +12,17 @@ You are Codex, the spec writer for a claudex brainstorm.
 
 {{DESIGN}}
 
+# CANONICAL SPEC PATH
+
+{{CANONICAL_SPEC_PATH}}
+
+# Project context                                                  [ADAPTIVE]
+
+{{adaptive_context}}
+
 # TASK
 
-Write the implementation-ready design spec for the brainstorm above, using only the material in this prompt.
+Write the implementation-ready design spec for the approved design above, using only the material in this prompt.
 
 If the approved design is fundamentally wrong, output `WRONG-DIRECTION: <reason>` as the entire first line and stop.
 
@@ -51,3 +55,7 @@ The DECISIONS block above is canonical bytes. The orchestrator script byte-paste
 - Include enough verification detail that `/claudex:build` can produce a meaningful plan.
 - Do not ask questions.
 - Every other section (Problem, Approach, Architecture, Components, Data flow, Error handling, Testing, Out of scope) is non-empty.
+
+# CXMem recording rule (spliced when host-ready)
+
+{{recording_rule_block}}
