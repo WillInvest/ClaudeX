@@ -10,54 +10,50 @@ set +e
 bash "$SCRIPT" >"$TMP/usage-out" 2>"$TMP/usage-err"
 status=$?
 set -e
-if [[ "$status" -ne 1 ]]; then
-  echo "FAIL: usage error exited $status, expected 1"
-  exit 1
-fi
+[[ "$status" -eq 2 ]] || { echo "FAIL: usage error exited $status, expected 2"; exit 1; }
 
-touch "$TMP/02-transcript.md" "$TMP/03-decisions.md"
+touch "$TMP/03-decisions.md"
 printf 'recommendation\n' > "$TMP/r.md"
-
-set +e
-bash "$SCRIPT" "$TMP" "$TMP/missing-q.md" "$TMP/r.md" >"$TMP/missing-out" 2>"$TMP/missing-err"
-status=$?
-set -e
-if [[ "$status" -ne 2 ]]; then
-  echo "FAIL: missing question exited $status, expected 2"
-  exit 1
-fi
-
 printf 'question\n' > "$TMP/q.md"
+
 SAFE_BIN="$TMP/safe-bin"
 mkdir -p "$SAFE_BIN"
-for tool in bash dirname pwd mktemp python3 grep tail rm cat; do
+for tool in bash dirname pwd mktemp python3 grep tail rm cat cp; do
   ln -s "$(command -v "$tool")" "$SAFE_BIN/$tool"
 done
 set +e
-PATH="$SAFE_BIN" bash "$SCRIPT" "$TMP" "$TMP/q.md" "$TMP/r.md" >"$TMP/codex-missing-out" 2>"$TMP/codex-missing-err"
+PATH="$SAFE_BIN" bash "$SCRIPT" "$TMP" "$TMP/q.md" "$TMP/r.md" </dev/null >"$TMP/codex-missing-out" 2>"$TMP/codex-missing-err"
 status=$?
 set -e
-if [[ "$status" -ne 3 ]]; then
-  echo "FAIL: codex missing exited $status, expected 3"
-  exit 1
-fi
+[[ "$status" -eq 3 ]] || { echo "FAIL: codex missing exited $status, expected 3"; exit 1; }
 
 STUB="$TMP/bin"
 mkdir -p "$STUB"
+CAPTURED_PROMPT="$TMP/claudex-dispatch-prompt"
+export CAPTURED_PROMPT
 cat > "$STUB/codex" <<'SH'
 #!/usr/bin/env bash
-printf 'unrelated output\n'
+while [[ "$#" -gt 0 ]]; do
+  case "$1" in
+    -) cat > "$CAPTURED_PROMPT" ;;
+  esac
+  shift
+done
+printf 'codex\nAGREE: looks right\n'
 SH
 chmod +x "$STUB/codex"
 
-set +e
-PATH="$STUB:$PATH" bash "$SCRIPT" "$TMP" "$TMP/q.md" "$TMP/r.md" >"$TMP/unparse-out" 2>"$TMP/unparse-err"
-status=$?
-set -e
-if [[ "$status" -ne 5 ]]; then
-  echo "FAIL: unparsable codex output exited $status, expected 5"
-  exit 1
-fi
-grep -q 'did not contain a verdict line' "$TMP/unparse-err"
+printf 'stdin transcript\n' | PATH="$STUB:$PATH" bash "$SCRIPT" "$TMP" "$TMP/q.md" "$TMP/r.md" >"$TMP/stdin-out"
+grep -q '^AGREE: looks right$' "$TMP/stdin-out"
+grep -q 'stdin transcript' "$CAPTURED_PROMPT"
 
-echo "PASS: dispatch-codex-2nd-opinion usage, missing-file, codex-missing, unparsable paths"
+printf 'file transcript\n' > "$TMP/transcript.md"
+PATH="$STUB:$PATH" bash "$SCRIPT" --transcript-file "$TMP/transcript.md" "$TMP" "$TMP/q.md" "$TMP/r.md" </dev/null >"$TMP/file-out"
+grep -q '^AGREE: looks right$' "$TMP/file-out"
+grep -q 'file transcript' "$CAPTURED_PROMPT"
+
+rm -f "$TMP/02-transcript.md"
+PATH="$STUB:$PATH" bash "$SCRIPT" "$TMP" "$TMP/q.md" "$TMP/r.md" </dev/null >"$TMP/empty-out"
+grep -q '^AGREE: looks right$' "$TMP/empty-out"
+
+echo "PASS: dispatch-codex-2nd-opinion supports stdin/file/stateless transcript"

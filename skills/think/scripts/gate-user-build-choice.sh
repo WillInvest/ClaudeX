@@ -1,22 +1,22 @@
 #!/usr/bin/env bash
-# Verifies the user chose a literal build launch mode before handoff.
+# Verifies the user accepted or declined detached build launch before handoff.
 # Usage: gate-user-build-choice.sh <run-dir>
 #
 # Reads:
-#   <run-dir>/.user-build-choice      must contain literal 1 or 2 with optional trailing whitespace
+#   <run-dir>/.user-build-choice      must contain y/yes/n/no with optional trailing whitespace
 # Writes:
 #   none
 # Stdout:
-#   USER_BUILD_CHOICE_1 | USER_BUILD_CHOICE_2
+#   USER_BUILD_YES | USER_BUILD_NO
 # Allowed tokens:
-#   USER_BUILD_CHOICE_1 | USER_BUILD_CHOICE_2
+#   USER_BUILD_YES | USER_BUILD_NO
 # Exit:
 #   0 success; token emitted
 #   2 usage / missing run dir
 #   3 missing or invalid user build choice
 #   4 unused
 #   5 unused
-# SKILL.md next-step contract: choice 1 runs inline build; choice 2 runs detached tmux build.
+# SKILL.md next-step contract: yes launches detached tmux build; no stops quietly.
 set -euo pipefail
 
 if [[ "$#" -ne 1 ]]; then
@@ -37,17 +37,17 @@ fi
 if python3 - "$CHOICE_FILE" <<'PY'
 import re, sys
 text = open(sys.argv[1], 'r', encoding='utf-8').read()
-sys.exit(0 if re.fullmatch(r'1[ \t\r\n]*', text) else 1)
+sys.exit(0 if re.fullmatch(r'(?i)y(?:es)?[ \t\r\n]*', text) else 1)
 PY
 then
-  echo "USER_BUILD_CHOICE_1"
+  echo "USER_BUILD_YES"
 elif python3 - "$CHOICE_FILE" <<'PY'
 import re, sys
 text = open(sys.argv[1], 'r', encoding='utf-8').read()
-sys.exit(0 if re.fullmatch(r'2[ \t\r\n]*', text) else 1)
+sys.exit(0 if re.fullmatch(r'(?i)n(?:o)?[ \t\r\n]*', text) else 1)
 PY
 then
-  echo "USER_BUILD_CHOICE_2"
+  echo "USER_BUILD_NO"
 else
   echo "error: invalid user build choice" >&2
   exit 3

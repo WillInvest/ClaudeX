@@ -10,12 +10,12 @@
 #   round: 1 | 2
 #
 # Reads:
-#   <run-dir>/02-transcript.md
 #   <run-dir>/03-decisions.md
+#   <run-dir>/04-design.md
 #   <approaches-file>                       typically <run-dir>/05-approaches.md
 #   <run-dir>/06-spec-r1.clean.md           (round 1) OR
 #   <run-dir>/08-spec-r2.clean.md           (round 2)
-#   ../spec-reviewer-prompt.md              template, slots: TRANSCRIPT/DECISIONS/APPROACHES/SPEC
+#   ../reviewer-prompt.md                   template, slots: stage/source_document/artifact
 #
 # Writes:
 #   <run-dir>/07-spec-r1-review-prompt.md   (round 1) OR
@@ -40,26 +40,33 @@ case "$ROUND" in
 esac
 
 [[ -d "$RUN_DIR" ]]                              || { echo "error: run dir not found: $RUN_DIR" >&2;       exit 2; }
-[[ -f "$RUN_DIR/02-transcript.md" ]]             || { echo "error: transcript missing" >&2;                exit 2; }
 [[ -f "$RUN_DIR/03-decisions.md" ]]              || { echo "error: decisions missing" >&2;                 exit 2; }
+[[ -f "$RUN_DIR/04-design.md" ]]                 || { echo "error: design missing" >&2;                    exit 2; }
 [[ -f "$APPROACHES_FILE" ]]                      || { echo "error: approaches not found: $APPROACHES_FILE" >&2; exit 2; }
 [[ -f "$SPEC" ]]                                 || { echo "error: spec not found: $SPEC" >&2;             exit 2; }
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-TEMPLATE="$SCRIPT_DIR/../spec-reviewer-prompt.md"
+TEMPLATE="$SCRIPT_DIR/../reviewer-prompt.md"
 [[ -f "$TEMPLATE" ]]                             || { echo "error: template missing: $TEMPLATE" >&2;       exit 2; }
 
-python3 - "$TEMPLATE" "$RUN_DIR/02-transcript.md" "$RUN_DIR/03-decisions.md" "$APPROACHES_FILE" "$SPEC" > "$OUT" <<'PY'
+python3 - "$TEMPLATE" "$RUN_DIR/03-decisions.md" "$RUN_DIR/04-design.md" "$APPROACHES_FILE" "$SPEC" > "$OUT" <<'PY'
 import sys
-template, t_path, d_path, a_path, s_path = sys.argv[1:]
+template, d_path, des_path, a_path, s_path = sys.argv[1:]
 def read(p):
     with open(p, 'r', encoding='utf-8') as f:
         return f.read()
+source = "\n\n".join([
+    "# APPROVED DESIGN",
+    read(des_path),
+    "# FROZEN DECISIONS",
+    read(d_path),
+    "# APPROACHES",
+    read(a_path),
+])
 text = read(template)
-text = text.replace('{{TRANSCRIPT}}', read(t_path))
-text = text.replace('{{DECISIONS}}',  read(d_path))
-text = text.replace('{{APPROACHES}}', read(a_path))
-text = text.replace('{{SPEC}}',       read(s_path))
+text = text.replace('{{stage}}', "spec")
+text = text.replace('{{source_document}}', source)
+text = text.replace('{{artifact}}', read(s_path))
 sys.stdout.write(text)
 PY
 

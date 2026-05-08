@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Dispatches Codex for a per-recommendation 2nd opinion.
-# Usage: dispatch-codex-2nd-opinion.sh <run-dir> <question-file> <recommendation-file>
+# Usage: dispatch-codex-2nd-opinion.sh [--transcript-file <path>] <run-dir> <question-file> <recommendation-file>
+#        cxmem-rounds-to-transcript.sh <sessions-root> <slug> | dispatch-codex-2nd-opinion.sh <run-dir> <question-file> <recommendation-file>
 #
 # Reads:
-#   <run-dir>/02-transcript.md       full transcript to date
+#   stdin or --transcript-file       projected transcript to date (empty is stateless mode)
 #   <run-dir>/03-decisions.md        decisions log
 #   <question-file>                  the question Claude plans to ask (markdown text)
 #   <recommendation-file>            Claude's recommendation (markdown text)
@@ -23,15 +24,24 @@
 #   5 codex output did not contain a recognizable verdict line
 set -euo pipefail
 
-RUN_DIR="${1:?usage: dispatch-codex-2nd-opinion.sh <run-dir> <question-file> <recommendation-file>}"
-QUESTION_FILE="${2:?usage: missing <question-file>}"
-RECOMMENDATION_FILE="${3:?usage: missing <recommendation-file>}"
+TRANSCRIPT_FILE=""
+if [[ "${1:-}" == "--transcript-file" ]]; then
+  [[ "$#" -ge 5 ]] || { echo "error: usage: dispatch-codex-2nd-opinion.sh [--transcript-file <path>] <run-dir> <question-file> <recommendation-file>" >&2; exit 2; }
+  TRANSCRIPT_FILE="$2"
+  shift 2
+fi
+
+[[ "$#" -eq 3 ]] || { echo "error: usage: dispatch-codex-2nd-opinion.sh [--transcript-file <path>] <run-dir> <question-file> <recommendation-file>" >&2; exit 2; }
+
+RUN_DIR="$1"
+QUESTION_FILE="$2"
+RECOMMENDATION_FILE="$3"
 
 [[ -d "$RUN_DIR" ]]                                 || { echo "error: run dir not found: $RUN_DIR" >&2;            exit 2; }
-[[ -f "$RUN_DIR/02-transcript.md" ]]                || { echo "error: transcript missing in $RUN_DIR" >&2;         exit 2; }
 [[ -f "$RUN_DIR/03-decisions.md" ]]                 || { echo "error: decisions missing in $RUN_DIR" >&2;          exit 2; }
 [[ -f "$QUESTION_FILE" ]]                           || { echo "error: question file not found: $QUESTION_FILE" >&2; exit 2; }
 [[ -f "$RECOMMENDATION_FILE" ]]                     || { echo "error: recommendation file not found: $RECOMMENDATION_FILE" >&2; exit 2; }
+[[ -z "$TRANSCRIPT_FILE" || -f "$TRANSCRIPT_FILE" ]] || { echo "error: transcript file not found: $TRANSCRIPT_FILE" >&2; exit 2; }
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TEMPLATE="$SCRIPT_DIR/../second-opinion-prompt.md"
@@ -39,10 +49,17 @@ TEMPLATE="$SCRIPT_DIR/../second-opinion-prompt.md"
 
 # Build prompt via python (handles multi-line slot content cleanly).
 PROMPT_FILE="$(mktemp -t codex-2nd-opinion-prompt.XXXXXX)"
+TRANSCRIPT_TMP="$(mktemp -t codex-2nd-opinion-transcript.XXXXXX)"
 RAW_OUT="$RUN_DIR/.last-2nd-opinion.raw"
-trap 'rm -f "$PROMPT_FILE"' EXIT
+trap 'rm -f "$PROMPT_FILE" "$TRANSCRIPT_TMP"' EXIT
 
-python3 - "$TEMPLATE" "$RUN_DIR/02-transcript.md" "$RUN_DIR/03-decisions.md" "$QUESTION_FILE" "$RECOMMENDATION_FILE" > "$PROMPT_FILE" <<'PY'
+if [[ -n "$TRANSCRIPT_FILE" ]]; then
+  cp "$TRANSCRIPT_FILE" "$TRANSCRIPT_TMP"
+else
+  cat > "$TRANSCRIPT_TMP"
+fi
+
+python3 - "$TEMPLATE" "$TRANSCRIPT_TMP" "$RUN_DIR/03-decisions.md" "$QUESTION_FILE" "$RECOMMENDATION_FILE" > "$PROMPT_FILE" <<'PY'
 import sys
 template, t_path, d_path, q_path, r_path = sys.argv[1:]
 def read(p):

@@ -4,9 +4,9 @@
 #
 # Reads:
 #   <run-dir>/03-decisions.md         decisions log that is being frozen
-#   <run-dir>/03-decisions.frozen     existing marker; re-freeze exits 0 quietly
+#   frozen marker                     existing marker; re-freeze exits 0 quietly
 # Writes:
-#   <run-dir>/03-decisions.frozen     freeze marker, created idempotently
+#   frozen marker                     created idempotently
 # Stdout:
 #   ok: frozen
 # Exit:
@@ -24,13 +24,14 @@ if [[ "$#" -ne 1 ]]; then
 fi
 
 RUN_DIR="$1"
+FROZEN_MARKER="$RUN_DIR/03-decisions.frozen"
 
 [[ -d "$RUN_DIR" ]] || { echo "error: run dir not found: $RUN_DIR" >&2; exit 2; }
 [[ -f "$RUN_DIR/03-decisions.md" ]] || { echo "error: decisions missing in $RUN_DIR" >&2; exit 2; }
 
-if [[ -f "$RUN_DIR/03-decisions.frozen" ]]; then
+if [[ -f "$FROZEN_MARKER" ]]; then
   exit 0
 fi
 
-printf 'frozen\n' > "$RUN_DIR/03-decisions.frozen" || { echo "error: failed to create freeze marker" >&2; exit 4; }
+printf 'frozen\n' > "$FROZEN_MARKER" || { echo "error: failed to create freeze marker" >&2; exit 4; }
 echo "ok: frozen"

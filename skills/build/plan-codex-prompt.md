@@ -30,3 +30,7 @@ You are drafting an implementation plan. An independent Claude Opus 4.7 reviewer
 - Markdown.
 - No preamble like "Here is the plan:" — start directly with the plan.
 - No editorializing about your process — just the plan.
+
+# CXMem recording rule (spliced when host-ready)
+
+{{recording_rule_block}}
