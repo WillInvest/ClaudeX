@@ -78,16 +78,28 @@ if [[ "$CXMEM_HOST_STATE" == "CXMEM_HOST_PROJECT_READY" ]]; then
   if jq -e '.degraded_recommended == true' "$RUN_DIR/$STAGE-r$CODEX_ROUND.cxmem.json" >/dev/null; then
     bash skills/build/scripts/write-cxmem-round.sh "$SESSIONS_ROOT" "$CXMEM_PROJECT" "$CXMEM_SESSION_SLUG" "$MAIN_ROUND_SEQ" "$STAGE" "$CODEX_ROUND" --degraded "$CODEX_LOG" "$GIT_DIFF_OR_EMPTY_STAT"
   else
-    bash skills/build/scripts/write-cxmem-round.sh "$SESSIONS_ROOT" "$CXMEM_PROJECT" "$CXMEM_SESSION_SLUG" "$MAIN_ROUND_SEQ" "$STAGE" "$CODEX_ROUND" "$RUN_DIR/$STAGE-r$CODEX_ROUND.cxmem.json"
+    reviewer_args=()
+    if [[ -f "$REVIEWER_REVIEW_PATH" ]]; then
+      reviewer_args=(--reviewer-review "$REVIEWER_REVIEW_PATH")
+    elif [[ -n "${REVIEWER_SKIPPED_SUMMARY:-}" ]]; then
+      reviewer_args=(--reviewer-skipped "$REVIEWER_SKIPPED_SUMMARY")
+    else
+      reviewer_args=(--reviewer-unavailable "${REVIEWER_UNAVAILABLE_REASON:-reviewer artifact unavailable}")
+    fi
+    bash skills/build/scripts/write-cxmem-round.sh "$SESSIONS_ROOT" "$CXMEM_PROJECT" "$CXMEM_SESSION_SLUG" "$MAIN_ROUND_SEQ" "$STAGE" "$CODEX_ROUND" "$RUN_DIR/$STAGE-r$CODEX_ROUND.cxmem.json" \
+      --prompt "$CODEX_PROMPT_PATH" \
+      --clean-output "$CODEX_CLEAN_OUTPUT_PATH" \
+      "${reviewer_args[@]}"
   fi
 fi
 ```
 
-Codex-derived round files close immediately after the codex exec/parser/writer sequence completes. When the parent main round closes, codex-derived summaries are promoted as nested sub-list items under that parent in `session-memory.md`; `project-memory.md` receives only the parent main-round session-log row, not separate rows for codex-derived rounds.
+Codex-derived round files receive prompt/output/reviewer evidence immediately after the codex exec/parser/writer sequence completes. Their `## Round close` section is deferred until the parent main round closes, so it can summarize the final close context. When the parent main round closes, codex-derived summaries are promoted as nested sub-list items under that parent in `session-memory.md`; `project-memory.md` receives only the parent main-round session-log row, not separate rows for codex-derived rounds.
 
 Run the promotion helper after the parent close block is appended:
 
 ```bash
+bash skills/build/scripts/append-codex-round-close.sh "$SESSIONS_ROOT" "$CXMEM_PROJECT" "$CXMEM_SESSION_SLUG" "$MAIN_ROUND_SEQ"
 bash skills/build/scripts/promote-codex-round.sh "$SESSIONS_ROOT" "$CXMEM_PROJECT" "$CXMEM_SESSION_SLUG" "$MAIN_ROUND_SEQ"
 ```
 

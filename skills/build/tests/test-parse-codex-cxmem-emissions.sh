@@ -108,6 +108,42 @@ EOF
 bash "$SCRIPT" "$SCRATCH/threshold.log" > "$SCRATCH/threshold.json"
 jq -e '.record_blocks_seen == 3 and .record_blocks_malformed == 2 and .degraded_recommended == true' "$SCRATCH/threshold.json" >/dev/null
 
+cat > "$SCRATCH/duplicates.log" <<'EOF'
+<<<CXMEM-RECORD>>>
+{"stage":"impl","round":7,"seq":1,"tool":"Read","plan":"first","tool_summary":"kept","findings":["a"],"next_plan":"n"}
+<<<END>>>
+<<<CXMEM-RECORD>>>
+{"stage":"impl","round":7,"seq":1,"tool":"Read","plan":"second","tool_summary":"duplicate","findings":["b"],"next_plan":"n"}
+<<<END>>>
+<<<CXMEM-SUMMARY>>>
+summary
+<<<END>>>
+EOF
+bash "$SCRIPT" "$SCRATCH/duplicates.log" > "$SCRATCH/duplicates.json"
+jq -e '.records | length == 1' "$SCRATCH/duplicates.json" >/dev/null
+jq -e '.records[0].plan == "first"' "$SCRATCH/duplicates.json" >/dev/null
+jq -e 'any(.warnings[]; . == "duplicate record skipped: stage=impl round=7 seq=1 tool=Read")' "$SCRATCH/duplicates.json" >/dev/null
+
+cat > "$SCRATCH/distinct-tuples.log" <<'EOF'
+<<<CXMEM-RECORD>>>
+{"stage":"impl","round":7,"seq":1,"tool":"Read","plan":"p1","tool_summary":"s1","findings":[],"next_plan":"n"}
+<<<END>>>
+<<<CXMEM-RECORD>>>
+{"stage":"impl","round":7,"seq":2,"tool":"Read","plan":"p2","tool_summary":"s2","findings":[],"next_plan":"n"}
+<<<END>>>
+<<<CXMEM-RECORD>>>
+{"stage":"impl","round":8,"seq":1,"tool":"Read","plan":"p3","tool_summary":"s3","findings":[],"next_plan":"n"}
+<<<END>>>
+<<<CXMEM-SUMMARY>>>
+summary
+<<<END>>>
+EOF
+bash "$SCRIPT" "$SCRATCH/distinct-tuples.log" > "$SCRATCH/distinct-tuples.json"
+jq -e '.records | length == 3' "$SCRATCH/distinct-tuples.json" >/dev/null
+jq -e '.warnings | map(select(startswith("duplicate record skipped:"))) | length == 0' "$SCRATCH/distinct-tuples.json" >/dev/null
+jq -e 'any(.warnings[]; . == "round-number divergence warning: record round=8 differs from first valid round=7")' "$SCRATCH/distinct-tuples.json" >/dev/null
+jq -e '.records[2].round == 8' "$SCRATCH/distinct-tuples.json" >/dev/null
+
 for field in stage round seq tool plan tool_summary findings next_plan; do
   jq -n --arg field "$field" '
     {

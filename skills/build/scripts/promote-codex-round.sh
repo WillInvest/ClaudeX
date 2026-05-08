@@ -67,10 +67,18 @@ for path in "${CODEX_ROUNDS[@]}"; do
   label="$(basename "$path" .md)"
   label="${label#round-${MAIN_ROUND_SEQ}-}"
   summary="$(awk '
-    /^## Summary[[:space:]]*$/ { in_summary=1; next }
-    in_summary && /^## / { exit }
-    in_summary && NF { print; exit }
+    /^## Round close[[:space:]]*$/ { in_close=1; next }
+    in_close && /^## / { exit }
+    in_close && NF { print; exit }
   ' "$path")"
+  if [[ -z "$summary" ]]; then
+    echo "warning: falling back to ## Summary for legacy codex round: $path" >&2
+    summary="$(awk '
+      /^## Summary[[:space:]]*$/ { in_summary=1; next }
+      in_summary && /^## / { exit }
+      in_summary && NF { print; exit }
+    ' "$path")"
+  fi
   [[ -n "$summary" ]] || summary="No summary emitted."
   printf '  - %s: %s\n' "$label" "$summary" >> "$TMP.sub"
 done

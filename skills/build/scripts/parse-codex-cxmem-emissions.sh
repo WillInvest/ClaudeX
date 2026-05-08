@@ -112,6 +112,8 @@ if [[ -n "$current_type" ]]; then
 fi
 
 record_blocks_malformed=0
+declare -A seen_record_keys=()
+first_valid_round=""
 
 for path in "${record_paths[@]}"; do
   if ! parsed="$(jq -c . "$path" 2>/dev/null)"; then
@@ -145,6 +147,22 @@ for path in "${record_paths[@]}"; do
     record_blocks_malformed=$((record_blocks_malformed + 1))
     continue
   fi
+
+  stage="$(jq -r '.stage | tostring' <<< "$parsed")"
+  round="$(jq -r '.round | tostring' <<< "$parsed")"
+  seq="$(jq -r '.seq | tostring' <<< "$parsed")"
+  tool="$(jq -r '.tool | tostring' <<< "$parsed")"
+  if [[ -z "$first_valid_round" ]]; then
+    first_valid_round="$round"
+  elif [[ "$round" != "$first_valid_round" ]]; then
+    warn "round-number divergence warning: record round=$round differs from first valid round=$first_valid_round"
+  fi
+  record_key="${stage}"$'\t'"${round}"$'\t'"${seq}"$'\t'"${tool}"
+  if [[ -n "${seen_record_keys[$record_key]+x}" ]]; then
+    warn "duplicate record skipped: stage=$stage round=$round seq=$seq tool=$tool"
+    continue
+  fi
+  seen_record_keys[$record_key]=1
 
   jq -c '.version = (.version // 1)' <<< "$parsed" >> "$VALID_RECORDS"
 done
