@@ -51,7 +51,14 @@ Each stage runs Codex round 1, Opus review round 1, optional Codex fix or round 
 
 Reviewer verdicts are parsed literally: `ready-to-execute`, `fix-and-proceed`, `re-review-needed`, `escalate`. Round 2 is final; `re-review-needed` or `escalate` after round 2 escalates to the user.
 
-When `${RUN_DIR}/.mode-auto` exists, apply the auto gate at every reviewer/implementer convergence decision before showing any user-decision block. Continue and append a convergence row through `~/.claude/plugins/claudex/skills/think/scripts/record-decision.sh` only on `AGREE` with `--decided-by auto --foldability n/a --high-blast no`, or on foldable `ANGLE-MISSED` with `--decided-by auto --foldability folded --high-blast no`. Halt without an auto-recorded convergence row on `DISAGREE`, structural `ANGLE-MISSED`, high-blast, Codex failure, or unparsable verdict; show the same canonical halt block used by `~/.claude/plugins/claudex/skills/think/SKILL.md`. Never remove `${RUN_DIR}/.mode-auto`.
+Auto mode is active only when `${RUN_DIR}/.mode-auto` exists. At every reviewer/implementer convergence decision, check the sentinel before showing any user-decision block. Continue and append a convergence row through `~/.claude/plugins/claudex/skills/think/scripts/record-decision.sh` only on `AGREE` with `--decided-by auto --foldability n/a --high-blast no`, or on `ANGLE-MISSED` when the angle is folded without changing the structural answer, using `--decided-by auto --foldability folded --high-blast no`. Halt without an auto-recorded convergence row on `DISAGREE`, structural `ANGLE-MISSED`, high-blast, Codex failure, unparsable verdict, or ambiguous touched-file sets; show this canonical halt block:
+`Auto mode halted.`
+`Reason: <halt reason>.`
+`Review the Codex 2nd opinion above.`
+`Choose Claude, Codex, revise, or stop.`
+`Your call.`
+
+If the implementer/reviewer recommendation lacks explicit paths and the touched-file set is ambiguous, halt conservatively. After user resolution, record `--decided-by user --foldability n/a --high-blast ambiguous-halted`; for other halt resolutions, record `--decided-by user`, `--foldability structural` only for structural missed angles or `n/a` otherwise, and `--high-blast yes` for high-blast or `no` otherwise. Never remove `${RUN_DIR}/.mode-auto`.
 
 After every Codex exec in SPEC, PLAN, or IMPLEMENT:
 

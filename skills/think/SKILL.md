@@ -201,7 +201,7 @@ bash scripts/build-opus-spec-review-prompt.sh "$RUN_DIR" "$REVIEW_ROUND" "$RUN_D
 
 ## Stage 5 — Handoff
 
-Copy the accepted canonical spec to `${RUN_DIR}/00-spec.md`, export `RUN_ID`, and decide whether to launch `/claudex:build` in detached tmux now. In auto mode, evaluate D15 before the user prompt: `mode_auto=yes` when `${RUN_DIR}/.mode-auto` exists, `no_user_decisions=yes` when `${RUN_DIR}/03-decisions.md` has no `Decided-by: user` rows, and `stage3_agree=yes` when the latest Stage 3 second-opinion verdict is `AGREE`. If all three are true, write `${RUN_DIR}/.auto-launch-decision`, append a Stage 5 auto decision row with `Decided-by: auto`, `Foldability: n/a`, `High-blast: no`, and invoke the existing `start-tmux-build.sh` path. If `${RUN_DIR}/.auto-launch-decision` cannot be written, treat `auto_launch=no`, append a decision body that captures the write-failure note, and continue to the legacy yes/no prompt.
+Copy the accepted canonical spec to `${RUN_DIR}/00-spec.md`, export `RUN_ID`, and decide whether to launch `/claudex:build` in detached tmux now. Derive the latest Stage 3 verdict before D15 from the last `Codex 2nd-opinion verdict:` row in `${RUN_DIR}/03-decisions.md`, which is written before `.design-approved`. In auto mode, evaluate D15 before the user prompt: `mode_auto=yes` when `${RUN_DIR}/.mode-auto` exists, `no_user_decisions=yes` when `${RUN_DIR}/03-decisions.md` has no `Decided-by: user` rows, and `stage3_agree=yes` when the latest Stage 3 second-opinion verdict is `AGREE`. If all three are true, write `${RUN_DIR}/.auto-launch-decision`, append a Stage 5 auto decision row with `Decided-by: auto`, `Foldability: n/a`, `High-blast: no`, and invoke the existing `start-tmux-build.sh` path. If `${RUN_DIR}/.auto-launch-decision` cannot be written, treat `auto_launch=no`, append a decision body that captures the write-failure note, and continue to the legacy yes/no prompt.
 
 When D15 is false or auto-launch marker writing fails, keep the existing yes/no handoff behavior. The build-choice presentation is a user-decision-requesting turn, so run the second opinion before showing choices. The user must answer yes or no; write it to `${RUN_DIR}/.user-build-choice`. On yes, export `RUN_ID`, `RUN_DIR`, `CANONICAL_SPEC_PATH`, `CXMEM_HOME`, `CXMEM_PROJECT`, `CXMEM_HOST_STATE`, `CXMEM_SESSION_SLUG`, `SESSIONS_ROOT`, and `MAIN_ROUND_SEQ`; `start-tmux-build.sh` launches exactly one detached session named `claudex-build-${CXMEM_PROJECT}-${RUN_ID}`.
 
@@ -218,20 +218,30 @@ When D15 is false or auto-launch marker writing fails, keep the existing yes/no 
 
 ```bash
 cp "$CANONICAL_SPEC_PATH" "$RUN_DIR/00-spec.md"
-if [[ -f "$RUN_DIR/.mode-auto" ]] && ! grep -q '^Decided-by: user$' "$RUN_DIR/03-decisions.md" && [[ "$LATEST_STAGE3_VERDICT" == AGREE ]]; then
-  if printf 'auto_launch=yes\nmode_auto=yes\nno_user_decisions=yes\nstage3_agree=yes\n' > "$RUN_DIR/.auto-launch-decision"; then
+LATEST_STAGE3_VERDICT="$(grep -E '^Codex 2nd-opinion verdict:' "$RUN_DIR/03-decisions.md" | tail -1 | sed -E 's/^Codex 2nd-opinion verdict: ([A-Z-]+):.*/\1/')"
+MODE_AUTO="no"; NO_USER_DECISIONS="no"; STAGE3_AGREE="no"
+[[ -f "$RUN_DIR/.mode-auto" ]] && MODE_AUTO="yes"
+grep -q '^Decided-by: user$' "$RUN_DIR/03-decisions.md" || NO_USER_DECISIONS="yes"
+[[ "$LATEST_STAGE3_VERDICT" == "AGREE" ]] && STAGE3_AGREE="yes"
+if [[ "$MODE_AUTO" == yes && "$NO_USER_DECISIONS" == yes && "$STAGE3_AGREE" == yes ]]; then
+  if printf 'auto_launch=yes\nmode_auto=%s\nno_user_decisions=%s\nstage3_agree=%s\nlatest_stage3_verdict=%s\n' "$MODE_AUTO" "$NO_USER_DECISIONS" "$STAGE3_AGREE" "$LATEST_STAGE3_VERDICT" > "$RUN_DIR/.auto-launch-decision"; then
+    DECISION_ID="stage5-auto-launch-$(date -u +%Y-%m-%d-%H%M)"
+    DECISION_FILE="$RUN_DIR/.stage5-auto.md"
+    printf 'Decision: auto-launch claudex-build\nPredicate: mode_auto=%s no_user_decisions=%s stage3_agree=%s\nCodex 2nd-opinion verdict: %s: latest Stage 3 design gate\n' "$MODE_AUTO" "$NO_USER_DECISIONS" "$STAGE3_AGREE" "$LATEST_STAGE3_VERDICT" > "$DECISION_FILE"
     bash scripts/record-decision.sh "$RUN_DIR" "$DECISION_ID" "$DECISION_FILE" --decided-by auto --foldability n/a --high-blast no
     RUN_ID="$RUN_ID" RUN_DIR="$RUN_DIR" CANONICAL_SPEC_PATH="$CANONICAL_SPEC_PATH" CXMEM_HOME="${CXMEM_HOME:-}" CXMEM_PROJECT="${CXMEM_PROJECT:-}" CXMEM_HOST_STATE="${CXMEM_HOST_STATE:-}" CXMEM_SESSION_SLUG="${CXMEM_SESSION_SLUG:-}" SESSIONS_ROOT="${SESSIONS_ROOT:-}" MAIN_ROUND_SEQ="${MAIN_ROUND_SEQ:-}" bash scripts/start-tmux-build.sh
   else
     AUTO_LAUNCH_WRITE_FAILED="failed to write $RUN_DIR/.auto-launch-decision"
-    printf '\nAuto-launch write failure: %s\n' "$AUTO_LAUNCH_WRITE_FAILED" >> "$DECISION_FILE"
+    DECISION_ID="stage5-auto-launch-write-failed-$(date -u +%Y-%m-%d-%H%M)"
+    DECISION_FILE="$RUN_DIR/.stage5-auto.md"
+    printf 'Decision: halt auto-launch for user handoff\nPredicate: mode_auto=%s no_user_decisions=%s stage3_agree=%s\nAuto-launch write failure: %s\n' "$MODE_AUTO" "$NO_USER_DECISIONS" "$STAGE3_AGREE" "$AUTO_LAUNCH_WRITE_FAILED" > "$DECISION_FILE"
     bash scripts/record-decision.sh "$RUN_DIR" "$DECISION_ID" "$DECISION_FILE" --decided-by user --foldability n/a --high-blast no
     bash scripts/dispatch-codex-2nd-opinion.sh "$RUN_DIR" "$RUN_DIR/.q.md" "$RUN_DIR/.r.md"
     bash scripts/gate-user-build-choice.sh "$RUN_DIR"
     RUN_ID="$RUN_ID" RUN_DIR="$RUN_DIR" CANONICAL_SPEC_PATH="$CANONICAL_SPEC_PATH" CXMEM_HOME="${CXMEM_HOME:-}" CXMEM_PROJECT="${CXMEM_PROJECT:-}" CXMEM_HOST_STATE="${CXMEM_HOST_STATE:-}" CXMEM_SESSION_SLUG="${CXMEM_SESSION_SLUG:-}" SESSIONS_ROOT="${SESSIONS_ROOT:-}" MAIN_ROUND_SEQ="${MAIN_ROUND_SEQ:-}" bash scripts/start-tmux-build.sh
   fi
 else
-  printf 'auto_launch=no\nmode_auto=%s\nno_user_decisions=%s\nstage3_agree=%s\n' "${MODE_AUTO:-no}" "${NO_USER_DECISIONS:-no}" "${STAGE3_AGREE:-no}" > "$RUN_DIR/.auto-launch-decision" 2>/dev/null || true
+  printf 'auto_launch=no\nmode_auto=%s\nno_user_decisions=%s\nstage3_agree=%s\nlatest_stage3_verdict=%s\n' "$MODE_AUTO" "$NO_USER_DECISIONS" "$STAGE3_AGREE" "$LATEST_STAGE3_VERDICT" > "$RUN_DIR/.auto-launch-decision" 2>/dev/null || true
   bash scripts/dispatch-codex-2nd-opinion.sh "$RUN_DIR" "$RUN_DIR/.q.md" "$RUN_DIR/.r.md"
   bash scripts/gate-user-build-choice.sh "$RUN_DIR"
   RUN_ID="$RUN_ID" RUN_DIR="$RUN_DIR" CANONICAL_SPEC_PATH="$CANONICAL_SPEC_PATH" CXMEM_HOME="${CXMEM_HOME:-}" CXMEM_PROJECT="${CXMEM_PROJECT:-}" CXMEM_HOST_STATE="${CXMEM_HOST_STATE:-}" CXMEM_SESSION_SLUG="${CXMEM_SESSION_SLUG:-}" SESSIONS_ROOT="${SESSIONS_ROOT:-}" MAIN_ROUND_SEQ="${MAIN_ROUND_SEQ:-}" bash scripts/start-tmux-build.sh
