@@ -46,19 +46,23 @@ record_fixture() {
 
 d15_eval() {
   local run="$1"
-  LATEST_STAGE3_VERDICT="$(grep -E '^Codex 2nd-opinion verdict:' "$run/03-decisions.md" | tail -1 | sed -E 's/^Codex 2nd-opinion verdict: ([A-Z-]+):.*/\1/')"
+  LATEST_STAGE3_BLOCK="$(awk '/^Decision ID:/{block=""} {block = block $0 ORS} END{printf "%s", block}' "$run/03-decisions.md")"
+  LATEST_STAGE3_VERDICT="$(printf '%s' "$LATEST_STAGE3_BLOCK" | grep -E '^Codex 2nd-opinion verdict:' | head -1 | sed -E 's/^Codex 2nd-opinion verdict: ([A-Z-]+):.*/\1/')"
+  LATEST_STAGE3_FOLDABILITY="$(printf '%s' "$LATEST_STAGE3_BLOCK" | grep -E '^Foldability:' | head -1 | sed -E 's/^Foldability: (.*)/\1/')"
   MODE_AUTO="no"; NO_USER_DECISIONS="no"; STAGE3_AGREE="no"
   [[ -f "$run/.mode-auto" ]] && MODE_AUTO="yes"
   grep -q '^Decided-by: user$' "$run/03-decisions.md" || NO_USER_DECISIONS="yes"
-  [[ "$LATEST_STAGE3_VERDICT" == "AGREE" ]] && STAGE3_AGREE="yes"
+  if [[ "$LATEST_STAGE3_VERDICT" == "AGREE" ]] || { [[ "$LATEST_STAGE3_VERDICT" == "ANGLE-MISSED" ]] && [[ "$LATEST_STAGE3_FOLDABILITY" == "folded" ]]; }; then
+    STAGE3_AGREE="yes"
+  fi
   printf '%s %s %s\n' "$MODE_AUTO" "$NO_USER_DECISIONS" "$STAGE3_AGREE"
 }
 
 write_decision() {
-  local run="$1" id="$2" verdict="$3" decided="$4"
+  local run="$1" id="$2" verdict="$3" decided="$4" fold="${5:-n/a}"
   local file="$run/$id.md"
   printf 'Decision: %s\nCodex 2nd-opinion verdict: %s: d15\n' "$id" "$verdict" > "$file"
-  "$RECORD" "$run" "$id" "$file" --decided-by "$decided" --foldability n/a --high-blast no >/dev/null
+  "$RECORD" "$run" "$id" "$file" --decided-by "$decided" --foldability "$fold" --high-blast no >/dev/null
 }
 
 record_fixture stage-agree AGREE auto n/a no absent
@@ -94,6 +98,18 @@ touch "$run/.mode-auto"
 write_decision "$run" d15-stage3 DISAGREE auto
 [[ "$(d15_eval "$run")" == "yes yes no" ]] || fail "D15 stage3_agree=no"
 pass "D15 conjunct stage3_agree=no"
+
+run="$(new_run d15-stage3-folded)"
+touch "$run/.mode-auto"
+write_decision "$run" d15-stage3-folded ANGLE-MISSED auto folded
+[[ "$(d15_eval "$run")" == "yes yes yes" ]] || fail "D15 stage3_agree=yes (ANGLE-MISSED+folded)"
+pass "D15 conjunct stage3_agree=yes via folded ANGLE-MISSED"
+
+run="$(new_run d15-stage3-structural)"
+touch "$run/.mode-auto"
+write_decision "$run" d15-stage3-structural ANGLE-MISSED user structural
+[[ "$(d15_eval "$run")" == "yes no no" ]] || fail "D15 stage3_agree=no (structural ANGLE-MISSED)"
+pass "D15 conjunct stage3_agree=no via structural ANGLE-MISSED"
 
 run="$(new_run d15-launch)"
 spec="$run/spec.md"; : > "$spec"
