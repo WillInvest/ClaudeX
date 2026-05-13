@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 RESOLVER="$ROOT/skills/build/scripts/resolve-run-dir.sh"
-HANDOFF="$ROOT/skills/think/scripts/start-tmux-build.sh"
+HANDOFF="$ROOT/skills/think/scripts/start-bg-build.sh"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
@@ -13,14 +13,18 @@ mkdir -p "$legacy" "$TMP/bin"
 
 cat > "$TMP/bin/claude" <<'SH'
 #!/usr/bin/env bash
+case "$1" in
+  --help)
+    printf '%s\n' '  --bg backgrounded'
+    exit 0
+    ;;
+esac
+ARGS_FILE="${CLAUDE_ARGS_FILE:-/dev/null}"
+printf '%s\n' "$@" > "$ARGS_FILE"
+printf 'backgrounded \xc2\xb7 deadbeef\n'
 exit 0
 SH
-cat > "$TMP/bin/tmux" <<'SH'
-#!/usr/bin/env bash
-printf '%s\n' "$*" >> "$TMUX_ARGS_FILE"
-exit 0
-SH
-chmod +x "$TMP/bin/claude" "$TMP/bin/tmux"
+chmod +x "$TMP/bin/claude"
 
 snapshot() {
   find "$legacy" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort
@@ -39,14 +43,16 @@ run_case() {
   mkdir -p "$run_dir"
   touch "$run_dir/.design-approved" "$run_dir/03-decisions.frozen"
   printf '# spec\n' > "$run_dir/spec.md"
-  HOME="$home" CXMEM_HOME="$cxmem" CXMEM_PROJECT=mem CXMEM_HOST_STATE="$state" CXMEM_SESSION_SLUG="session-slug" SESSIONS_ROOT="$cxmem/projects/mem/sessions" MAIN_ROUND_SEQ="1" \
-    TMUX_ARGS_FILE="$TMP/tmux-$state.args" PATH="$TMP/bin:$PATH" RUN_ID="$run_id" RUN_DIR="$run_dir" CANONICAL_SPEC_PATH="$run_dir/spec.md" \
+  HOME="$home" CXMEM_HOME="$cxmem" CXMEM_PROJECT=mem CXMEM_HOST_STATE="$state" \
+    CXMEM_SESSION_SLUG="session-slug" SESSIONS_ROOT="$cxmem/projects/mem/sessions" MAIN_ROUND_SEQ="1" \
+    CLAUDE_ARGS_FILE="$TMP/claude-$state.args" PATH="$TMP/bin:$PATH" \
+    RUN_ID="$run_id" RUN_DIR="$run_dir" CANONICAL_SPEC_PATH="$run_dir/spec.md" \
     bash "$HANDOFF" > "$TMP/handoff-$state.out"
   snapshot > "$TMP/after-$state"
   cmp "$TMP/before-$state" "$TMP/after-$state"
   [[ "$run_dir" != "$legacy/"* ]]
-  [[ -f "$run_dir/.tmux-prompt.md" ]]
-  grep -q -- "-e RUN_DIR=$run_dir" "$TMP/tmux-$state.args"
+  [[ -f "$run_dir/.bg-prompt.md" ]]
+  grep -qx -- '--bg' "$TMP/claude-$state.args"
 }
 
 run_case CXMEM_HOST_PROJECT_READY run-ready

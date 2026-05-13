@@ -11,11 +11,11 @@ CXMem records the raw transcript per round: the user prompt, verbatim assistant 
 
 Source files for each project live under `~/vault/projects/<X>/` (each is its own git repo); transcripts live under `~/CXMem/projects/<X>/`. After `claudex:build` finishes IMPLEMENT, commit source changes in the vault repo *before* writing `99-summary.md`; reference the commit SHA in the summary.
 
-Auto mode (`/claudex:auto`, sentinel `${RUN_DIR}/.mode-auto`) launches `claudex:build` in a detached tmux session named `claudex-build-${CXMEM_PROJECT}-${RUN_ID}`. A session is finished when its run directory contains `99-summary.md` — those tmux sessions are safe to kill; do not kill mid-stage ones.
+Auto mode (`/claudex:auto`, sentinel `${RUN_DIR}/.mode-auto`) launches `claudex:build` as a backgrounded `claude --bg` session displayed as `claudex-build-${CXMEM_PROJECT}-${RUN_ID}` in `claude agents` / the agent monitor. A session is finished when its run directory contains `99-summary.md` — those backgrounded agents are safe to `claude stop`; do not stop mid-stage ones.
 
 # claudex-think
 
-Use `/claudex:think` when the user has an idea that needs framing, tradeoffs, and design approval before autonomous build. Think does not write the implementation spec and does not create transcript files. It records decisions, approves design, freezes those decisions immediately, then asks whether to launch `/claudex:build` in detached tmux.
+Use `/claudex:think` when the user has an idea that needs framing, tradeoffs, and design approval before autonomous build. Think does not write the implementation spec and does not create transcript files. It records decisions, approves design, freezes those decisions immediately, then asks whether to launch `/claudex:build` as a backgrounded `claude --bg` agent.
 
 Every user-decision-requesting turn requires a 2nd-opinion dispatch before showing the turn to the user. The dispatch uses `scripts/dispatch-codex-2nd-opinion.sh`; the transcript slot is populated by projecting CXMem main rounds with `scripts/cxmem-rounds-to-transcript.sh <sessions-root> <slug>`, or left empty for stateless mode. `02-transcript.md` is not created.
 
@@ -211,9 +211,9 @@ bash scripts/build-opus-spec-review-prompt.sh "$RUN_DIR" "$REVIEW_ROUND" "$RUN_D
 
 ## Stage 5 — Handoff
 
-Copy the accepted canonical spec to `${RUN_DIR}/00-spec.md`, export `RUN_ID`, and decide whether to launch `/claudex:build` in detached tmux now. Derive the latest Stage 3 verdict and its paired foldability before D15 from the last `Decision ID:` block in `${RUN_DIR}/03-decisions.md`, which is written before `.design-approved`. In auto mode, evaluate D15 before the user prompt: `mode_auto=yes` when `${RUN_DIR}/.mode-auto` exists, `no_user_decisions=yes` when `${RUN_DIR}/03-decisions.md` has no `Decided-by: user` rows, and `stage3_agree=yes` when the latest Stage 3 second-opinion verdict is `AGREE`, or `ANGLE-MISSED` paired with `Foldability: folded` (mirroring the in-stage auto-record contract from Stages 1–3 — folded ANGLE-MISSED is equivalent to AGREE for proceeding, since the angle has been merged into the design without changing the structural answer). If all three are true, write `${RUN_DIR}/.auto-launch-decision`, append a Stage 5 auto decision row with `Decided-by: auto`, `Foldability: n/a`, `High-blast: no`, and invoke the existing `start-tmux-build.sh` path. If `${RUN_DIR}/.auto-launch-decision` cannot be written, treat `auto_launch=no`, append a decision body that captures the write-failure note, and continue to the legacy yes/no prompt.
+Copy the accepted canonical spec to `${RUN_DIR}/00-spec.md`, export `RUN_ID`, and decide whether to launch `/claudex:build` as a backgrounded `claude --bg` agent now. Derive the latest Stage 3 verdict and its paired foldability before D15 from the last `Decision ID:` block in `${RUN_DIR}/03-decisions.md`, which is written before `.design-approved`. In auto mode, evaluate D15 before the user prompt: `mode_auto=yes` when `${RUN_DIR}/.mode-auto` exists, `no_user_decisions=yes` when `${RUN_DIR}/03-decisions.md` has no `Decided-by: user` rows, and `stage3_agree=yes` when the latest Stage 3 second-opinion verdict is `AGREE`, or `ANGLE-MISSED` paired with `Foldability: folded` (mirroring the in-stage auto-record contract from Stages 1–3 — folded ANGLE-MISSED is equivalent to AGREE for proceeding, since the angle has been merged into the design without changing the structural answer). If all three are true, write `${RUN_DIR}/.auto-launch-decision`, append a Stage 5 auto decision row with `Decided-by: auto`, `Foldability: n/a`, `High-blast: no`, and invoke the `start-bg-build.sh` dispatcher. If `${RUN_DIR}/.auto-launch-decision` cannot be written, treat `auto_launch=no`, append a decision body that captures the write-failure note, and continue to the legacy yes/no prompt.
 
-When D15 is false or auto-launch marker writing fails, keep the existing yes/no handoff behavior. The build-choice presentation is a user-decision-requesting turn, so run the second opinion before showing choices. The user must answer yes or no; write it to `${RUN_DIR}/.user-build-choice`. On yes, export `RUN_ID`, `RUN_DIR`, `CANONICAL_SPEC_PATH`, `CXMEM_HOME`, `CXMEM_PROJECT`, `CXMEM_HOST_STATE`, `CXMEM_SESSION_SLUG`, `SESSIONS_ROOT`, and `MAIN_ROUND_SEQ`; `start-tmux-build.sh` launches exactly one detached session named `claudex-build-${CXMEM_PROJECT}-${RUN_ID}`.
+When D15 is false or auto-launch marker writing fails, keep the existing yes/no handoff behavior. The build-choice presentation is a user-decision-requesting turn, so run the second opinion before showing choices. The user must answer yes or no; write it to `${RUN_DIR}/.user-build-choice`. On yes, export `RUN_ID`, `RUN_DIR`, `CANONICAL_SPEC_PATH`, `CXMEM_HOME`, `CXMEM_PROJECT`, `CXMEM_HOST_STATE`, `CXMEM_SESSION_SLUG`, `SESSIONS_ROOT`, and `MAIN_ROUND_SEQ`; `start-bg-build.sh` launches exactly one backgrounded `claude --bg` agent named `claudex-build-${CXMEM_PROJECT}-${RUN_ID}`.
 
 ### Inputs
 
@@ -222,7 +222,7 @@ When D15 is false or auto-launch marker writing fails, keep the existing yes/no 
 - `${RUN_DIR}/.user-build-choice`: `y`, `yes`, `n`, or `no`.
 - `$CANONICAL_SPEC_PATH`: accepted spec from Stage 4.
 - `CXMEM_HOME`, `CXMEM_PROJECT`, `CXMEM_HOST_STATE`, `CXMEM_SESSION_SLUG`, `SESSIONS_ROOT`, `MAIN_ROUND_SEQ` when present.
-- `tmux`: required for detached build launcher.
+- `claude` CLI ≥2.1.140 with `--bg`; bypass-permissions disclaimer accepted once interactively.
 
 ### Dispatch
 
@@ -243,7 +243,7 @@ if [[ "$MODE_AUTO" == yes && "$NO_USER_DECISIONS" == yes && "$STAGE3_AGREE" == y
     DECISION_FILE="$RUN_DIR/.stage5-auto.md"
     printf 'Decision: auto-launch claudex-build\nPredicate: mode_auto=%s no_user_decisions=%s stage3_agree=%s\nCodex 2nd-opinion verdict: %s: latest Stage 3 design gate (foldability=%s)\n' "$MODE_AUTO" "$NO_USER_DECISIONS" "$STAGE3_AGREE" "$LATEST_STAGE3_VERDICT" "$LATEST_STAGE3_FOLDABILITY" > "$DECISION_FILE"
     bash scripts/record-decision.sh "$RUN_DIR" "$DECISION_ID" "$DECISION_FILE" --decided-by auto --foldability n/a --high-blast no
-    RUN_ID="$RUN_ID" RUN_DIR="$RUN_DIR" CANONICAL_SPEC_PATH="$CANONICAL_SPEC_PATH" CXMEM_HOME="${CXMEM_HOME:-}" CXMEM_PROJECT="${CXMEM_PROJECT:-}" CXMEM_HOST_STATE="${CXMEM_HOST_STATE:-}" CXMEM_SESSION_SLUG="${CXMEM_SESSION_SLUG:-}" SESSIONS_ROOT="${SESSIONS_ROOT:-}" MAIN_ROUND_SEQ="${MAIN_ROUND_SEQ:-}" bash scripts/start-tmux-build.sh
+    RUN_ID="$RUN_ID" RUN_DIR="$RUN_DIR" CANONICAL_SPEC_PATH="$CANONICAL_SPEC_PATH" CXMEM_HOME="${CXMEM_HOME:-}" CXMEM_PROJECT="${CXMEM_PROJECT:-}" CXMEM_HOST_STATE="${CXMEM_HOST_STATE:-}" CXMEM_SESSION_SLUG="${CXMEM_SESSION_SLUG:-}" SESSIONS_ROOT="${SESSIONS_ROOT:-}" MAIN_ROUND_SEQ="${MAIN_ROUND_SEQ:-}" bash scripts/start-bg-build.sh
   else
     AUTO_LAUNCH_WRITE_FAILED="failed to write $RUN_DIR/.auto-launch-decision"
     DECISION_ID="stage5-auto-launch-write-failed-$(date -u +%Y-%m-%d-%H%M)"
@@ -252,13 +252,13 @@ if [[ "$MODE_AUTO" == yes && "$NO_USER_DECISIONS" == yes && "$STAGE3_AGREE" == y
     bash scripts/record-decision.sh "$RUN_DIR" "$DECISION_ID" "$DECISION_FILE" --decided-by user --foldability n/a --high-blast no
     bash scripts/dispatch-codex-2nd-opinion.sh "$RUN_DIR" "$RUN_DIR/.q.md" "$RUN_DIR/.r.md"
     bash scripts/gate-user-build-choice.sh "$RUN_DIR"
-    RUN_ID="$RUN_ID" RUN_DIR="$RUN_DIR" CANONICAL_SPEC_PATH="$CANONICAL_SPEC_PATH" CXMEM_HOME="${CXMEM_HOME:-}" CXMEM_PROJECT="${CXMEM_PROJECT:-}" CXMEM_HOST_STATE="${CXMEM_HOST_STATE:-}" CXMEM_SESSION_SLUG="${CXMEM_SESSION_SLUG:-}" SESSIONS_ROOT="${SESSIONS_ROOT:-}" MAIN_ROUND_SEQ="${MAIN_ROUND_SEQ:-}" bash scripts/start-tmux-build.sh
+    RUN_ID="$RUN_ID" RUN_DIR="$RUN_DIR" CANONICAL_SPEC_PATH="$CANONICAL_SPEC_PATH" CXMEM_HOME="${CXMEM_HOME:-}" CXMEM_PROJECT="${CXMEM_PROJECT:-}" CXMEM_HOST_STATE="${CXMEM_HOST_STATE:-}" CXMEM_SESSION_SLUG="${CXMEM_SESSION_SLUG:-}" SESSIONS_ROOT="${SESSIONS_ROOT:-}" MAIN_ROUND_SEQ="${MAIN_ROUND_SEQ:-}" bash scripts/start-bg-build.sh
   fi
 else
   printf 'auto_launch=no\nmode_auto=%s\nno_user_decisions=%s\nstage3_agree=%s\nlatest_stage3_verdict=%s\nlatest_stage3_foldability=%s\n' "$MODE_AUTO" "$NO_USER_DECISIONS" "$STAGE3_AGREE" "$LATEST_STAGE3_VERDICT" "$LATEST_STAGE3_FOLDABILITY" > "$RUN_DIR/.auto-launch-decision" 2>/dev/null || true
   bash scripts/dispatch-codex-2nd-opinion.sh "$RUN_DIR" "$RUN_DIR/.q.md" "$RUN_DIR/.r.md"
   bash scripts/gate-user-build-choice.sh "$RUN_DIR"
-  RUN_ID="$RUN_ID" RUN_DIR="$RUN_DIR" CANONICAL_SPEC_PATH="$CANONICAL_SPEC_PATH" CXMEM_HOME="${CXMEM_HOME:-}" CXMEM_PROJECT="${CXMEM_PROJECT:-}" CXMEM_HOST_STATE="${CXMEM_HOST_STATE:-}" CXMEM_SESSION_SLUG="${CXMEM_SESSION_SLUG:-}" SESSIONS_ROOT="${SESSIONS_ROOT:-}" MAIN_ROUND_SEQ="${MAIN_ROUND_SEQ:-}" bash scripts/start-tmux-build.sh
+  RUN_ID="$RUN_ID" RUN_DIR="$RUN_DIR" CANONICAL_SPEC_PATH="$CANONICAL_SPEC_PATH" CXMEM_HOME="${CXMEM_HOME:-}" CXMEM_PROJECT="${CXMEM_PROJECT:-}" CXMEM_HOST_STATE="${CXMEM_HOST_STATE:-}" CXMEM_SESSION_SLUG="${CXMEM_SESSION_SLUG:-}" SESSIONS_ROOT="${SESSIONS_ROOT:-}" MAIN_ROUND_SEQ="${MAIN_ROUND_SEQ:-}" bash scripts/start-bg-build.sh
 fi
 ```
 
@@ -266,10 +266,10 @@ fi
 
 | Output | Next step |
 |---|---|
-| `USER_BUILD_YES` | Invoke the detached tmux launch path. |
+| `USER_BUILD_YES` | Invoke the backgrounded `claude --bg` launch path. |
 | `USER_BUILD_NO` | Stop quietly; the approved design and frozen decisions remain in the run trail. |
-| tmux missing exit 3 | Halt with apt/brew install hints. |
-| start exit 4 | Halt and surface tmux session creation failure. |
+| `claude --bg` unavailable exit 3 | Halt with verbatim CLI-version (`claude install --version stable`) or disclaimer (`claude --dangerously-skip-permissions`) remediation hint. |
+| start exit 4 | Halt and surface `claude --bg` launch failure or job-id parse miss. |
 | gate exit 3 | Halt; only yes/no is accepted. |
 | dispatch exit 3 and `CODEX_STATE=MISSING` | Use `[Codex(fallback)]` sonnet subagent path, then present. |
 | dispatch exit 4 and `CODEX_STATE=READY` | Halt with stderr tail. |

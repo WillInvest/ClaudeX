@@ -16,7 +16,7 @@
 #   3 missing or invalid user build choice
 #   4 unused
 #   5 unused
-# SKILL.md next-step contract: yes launches detached tmux build; no stops quietly.
+# SKILL.md next-step contract: yes launches backgrounded `claude --bg` build; no stops quietly.
 set -euo pipefail
 
 if [[ "$#" -ne 1 ]]; then
