@@ -23,4 +23,4 @@ freeze_match="$(grep -o '03-decisions\.frozen' "$FREEZE" | head -1)"
 build_match="$(grep -o '03-decisions\.frozen' "$BUILD" | head -1)"
 [[ "$freeze_match" == "$build_match" ]] || { echo "FAIL: frozen-marker strings differ"; exit 1; }
 
-echo "PASS: think skill keeps spec review stage and uses yes/no tmux handoff"
+echo "PASS: think skill keeps spec review stage and uses yes/no bg handoff"

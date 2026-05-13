@@ -11,7 +11,7 @@ CXMem records the raw transcript per round: the user prompt, verbatim assistant 
 
 Source files for each project live under `~/vault/projects/<X>/` (each is its own git repo); transcripts live under `~/CXMem/projects/<X>/`. After `claudex:build` finishes IMPLEMENT, commit source changes in the vault repo *before* writing `99-summary.md`; reference the commit SHA in the summary.
 
-Auto mode (`/claudex:auto`, sentinel `${RUN_DIR}/.mode-auto`) launches `claudex:build` in a detached tmux session named `claudex-build-${CXMEM_PROJECT}-${RUN_ID}`. A session is finished when its run directory contains `99-summary.md` — those tmux sessions are safe to kill; do not kill mid-stage ones.
+Auto mode (`/claudex:auto`, sentinel `${RUN_DIR}/.mode-auto`) launches `claudex:build` as a backgrounded `claude --bg` session displayed as `claudex-build-${CXMEM_PROJECT}-${RUN_ID}` in `claude agents` / the agent monitor. A session is finished when its run directory contains `99-summary.md` — those backgrounded agents are safe to `claude stop`; do not stop mid-stage ones.
 
 # claudex-build — autonomous spec→plan→impl pipeline
 
@@ -29,12 +29,12 @@ fi
 CANONICAL_SPEC_PATH="${CANONICAL_SPEC_PATH:-<cwd-derived-spec-path>}"
 test -f "$RUN_DIR/03-decisions.frozen"
 CXMEM_HOST_STATE="$(bash skills/build/scripts/probe-cxmem-host.sh)"
-if [[ -z "${TMUX:-}" ]]; then
-  echo "[claudex-build][test-only/manual] running outside tmux; continuing for manual/test invocation"
+if [[ -z "${CLAUDE_JOB_DIR:-}" && -z "${TMUX:-}" ]]; then
+  echo "[claudex-build][test-only/manual] running outside backgrounded claude agent and tmux; continuing for manual/test invocation"
 fi
 ```
 
-When env vars are absent, derive `CANONICAL_SPEC_PATH` from the existing cwd rules used by think. Normal `/claudex:think` handoff supplies `RUN_ID`, `RUN_DIR`, and `CANONICAL_SPEC_PATH` and runs inside detached tmux; inherited `RUN_DIR` wins so an in-flight run cannot move if CXMem state changes. Direct/manual build invocation resolves fresh artifacts through `resolve-run-dir.sh`.
+When env vars are absent, derive `CANONICAL_SPEC_PATH` from the existing cwd rules used by think. Normal `/claudex:think` handoff supplies `RUN_ID`, `RUN_DIR`, and `CANONICAL_SPEC_PATH` and runs inside a backgrounded `claude --bg` agent; inherited `RUN_DIR` wins so an in-flight run cannot move if CXMem state changes. Direct/manual build invocation resolves fresh artifacts through `resolve-run-dir.sh`.
 
 Resolved run paths:
 

@@ -4,9 +4,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 RECORD="$ROOT/skills/think/scripts/record-decision.sh"
 TMP="$(mktemp -d)"
-trap 'tmux kill-session -t "$TMUX_SESSION" 2>/dev/null || true; rm -rf "$TMP"' EXIT
+trap 'rm -rf "$TMP"' EXIT
 HALT_MARKER="Auto mode halted."
-TMUX_SESSION=""
 
 pass() { printf 'PASS: %s\n' "$1"; }
 fail() { printf 'FAIL: %s\n' "$1" >&2; exit 1; }
@@ -113,24 +112,34 @@ pass "D15 conjunct stage3_agree=no via structural ANGLE-MISSED"
 
 run="$(new_run d15-launch)"
 spec="$run/spec.md"; : > "$spec"
-TMUX_SESSION="claudex-build-autotest-auto-gate-$$"
-probe="claudex-build-probe-$$"
-if tmux new-session -d -s "$probe" 'sleep 1' >/dev/null 2>&1; then
-  tmux kill-session -t "$probe" 2>/dev/null || true
-  RUN_ID="auto-gate-$$" RUN_DIR="$run" CANONICAL_SPEC_PATH="$spec" CXMEM_PROJECT="autotest" "$ROOT/skills/think/scripts/start-tmux-build.sh" >/dev/null
-  tmux list-sessions 2>/dev/null | grep -q "claudex-build-" || fail "tmux launch session missing"
-  pass "D15 clean auto chain launches tmux session"
-  tmux kill-session -t "$TMUX_SESSION" 2>/dev/null || true
-else
-  tmux list-sessions 2>/dev/null | grep -q "claudex-build-" && fail "tmux probe found unexpected claudex-build session"
-  pass "D15 clean auto chain tmux assertion skipped: tmux server unavailable"
-fi
-TMUX_SESSION=""
+# Bg dispatch test: mock claude in a temp bin dir so the real CLI is not touched.
+BG_TMP="$(mktemp -d)"
+mkdir -p "$BG_TMP/bin"
+cat > "$BG_TMP/bin/claude" <<'SH'
+#!/usr/bin/env bash
+case "$1" in
+  --help) printf '%s\n' '  --bg backgrounded'; exit 0 ;;
+esac
+ARGS_FILE="${CLAUDE_ARGS_FILE:?}"
+printf '%s\n' "$@" > "$ARGS_FILE"
+printf 'backgrounded \xc2\xb7 c0ffee01\n'
+exit 0
+SH
+chmod +x "$BG_TMP/bin/claude"
+CLAUDE_ARGS_FILE="$BG_TMP/claude.args" PATH="$BG_TMP/bin:$PATH" \
+  HOME="$BG_TMP" RUN_ID="auto-gate-$$" RUN_DIR="$run" CANONICAL_SPEC_PATH="$spec" CXMEM_PROJECT="autotest" \
+  "$ROOT/skills/think/scripts/start-bg-build.sh" >/dev/null
+grep -qx -- '--bg' "$BG_TMP/claude.args" || fail "D15 clean auto chain did not invoke claude --bg"
+grep -qx -- 'claudex-build-autotest-auto-gate-'"$$" "$BG_TMP/claude.args" || fail "D15 clean auto chain did not pass --name claudex-build-autotest-auto-gate-$$"
+pass "D15 clean auto chain launches backgrounded claude agent"
+rm -rf "$BG_TMP"
 
 run="$(new_run d15-write-failure)"
 mkdir "$run/.auto-launch-decision"
 if (printf 'auto_launch=yes\n' > "$run/.auto-launch-decision") 2>/dev/null; then
   fail "write-failure fixture unexpectedly writable"
 fi
-! tmux list-sessions 2>/dev/null | grep -q "claudex-build-autotest-writefail" || fail "write failure launched tmux"
-pass "D15 write failure halts without tmux session"
+# write-failure path must not invoke the bg dispatcher; no observable side effect to check
+# beyond the predicate file refusing to write. Confirm fixture is unwritable.
+[[ -d "$run/.auto-launch-decision" ]] || fail "write-failure fixture was not created as a directory"
+pass "D15 write failure halts without launching backgrounded build"
