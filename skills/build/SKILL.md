@@ -13,7 +13,7 @@ Source files for each project live under `~/vault/projects/<X>/` (each is its ow
 
 Auto mode (`/claudex:auto`, sentinel `${RUN_DIR}/.mode-auto`) launches `claudex:build` as a backgrounded `claude --bg` session displayed as `claudex-build-${CXMEM_PROJECT}-${RUN_ID}` in `claude agents` / the agent monitor. A session is finished when its run directory contains `99-summary.md` — those backgrounded agents are safe to `claude stop`; do not stop mid-stage ones.
 
-When build is launched from inside another `claude --bg` job (bg-inside-bg), the outer dispatch must always use the foreground `claude -p` intermediate pattern documented in the `### Bg-inside-bg dispatch` section of `~/.claude/plugins/claudex/skills/think/SKILL.md` Stage 5, regardless of prompt size; direct nested `claude --bg` is forbidden. Live `claude attach`/`claude logs` are blocked until the inner job finishes, and the build agent's `Write`/`Edit` tools are gated by `EnterWorktree`.
+When build is launched from inside another `claude --bg` job (bg-inside-bg), live `claude attach`/`claude logs` are blocked until the inner job finishes, and the build agent's `Write`/`Edit` tools are gated by `EnterWorktree`. See the `### Bg-inside-bg dispatch` section of `~/.claude/plugins/claudex/skills/think/SKILL.md` Stage 5 for full notes.
 
 # claudex-build — autonomous spec→plan→impl pipeline
 
