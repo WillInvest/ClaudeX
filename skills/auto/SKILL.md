@@ -13,6 +13,8 @@ Source files for each project live under `~/vault/projects/<X>/` (each is its ow
 
 Auto mode (`/claudex:auto`, sentinel `${RUN_DIR}/.mode-auto`) launches `claudex:build` as a backgrounded `claude --bg` session displayed as `claudex-build-${CXMEM_PROJECT}-${RUN_ID}` in `claude agents` / the agent monitor. A session is finished when its run directory contains `99-summary.md` — those backgrounded agents are safe to `claude stop`; do not stop mid-stage ones.
 
+When `/claudex:auto` itself runs inside another `claude --bg` job (`CLAUDE_JOB_DIR` set in its environment), always dispatch any nested `claude --bg` through a foreground `claude -p` intermediate (both legs prefixed with `env -u CLAUDE_JOB_DIR`), regardless of prompt size; direct nested `claude --bg` is forbidden. See the `### Bg-inside-bg dispatch` section in `~/.claude/plugins/claudex/skills/think/SKILL.md` Stage 5 for the exact command and rationale.
+
 # auto
 
 Use `/auto <topic>` when the user wants the normal `/claudex:think` workflow to auto-accept safe second-opinion gates and conditionally launch `/claudex:build`.

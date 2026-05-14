@@ -215,6 +215,26 @@ Copy the accepted canonical spec to `${RUN_DIR}/00-spec.md`, export `RUN_ID`, an
 
 When D15 is false or auto-launch marker writing fails, keep the existing yes/no handoff behavior. The build-choice presentation is a user-decision-requesting turn, so run the second opinion before showing choices. The user must answer yes or no; write it to `${RUN_DIR}/.user-build-choice`. On yes, export `RUN_ID`, `RUN_DIR`, `CANONICAL_SPEC_PATH`, `CXMEM_HOME`, `CXMEM_PROJECT`, `CXMEM_HOST_STATE`, `CXMEM_SESSION_SLUG`, `SESSIONS_ROOT`, and `MAIN_ROUND_SEQ`; `start-bg-build.sh` launches exactly one backgrounded `claude --bg` agent named `claudex-build-${CXMEM_PROJECT}-${RUN_ID}`.
 
+### Bg-inside-bg dispatch
+
+When think itself runs inside a backgrounded `claude --bg` job (`CLAUDE_JOB_DIR` is set in its environment), the nested `start-bg-build.sh` → `claude --bg` launch has two operational gotchas observed empirically in `~/CXMem/projects/claudex-imp/sessions/2026-05-13-2020-bg-build-dispatch/rounds/round-{15,19,20,21}.md`:
+
+1. Live attach and logs are blocked. `claude attach <id>` returns `Session can't redraw right now — Ctrl+Z to detach`; `claude logs <id>` returns empty during work. The TUI buffer flushes to disk and becomes readable only after the inner job reaches `done` or `stopped`; `state.json.firstTerminalAt` stays `None` for the working window even while real work is happening.
+2. The dispatched bg agent's `Write` and `Edit` tools are gated by the harness's `EnterWorktree` requirement. Agents that don't call `EnterWorktree` at startup or fall back to Bash heredoc will silently fail to persist any output.
+
+Required dispatch pattern (always use this, regardless of prompt size): launch every nested `claude --bg` through a foreground `claude -p` intermediate, with `env -u CLAUDE_JOB_DIR` stripped on both legs. The intermediate is mandatory — do not call `claude --bg` directly from inside a bg job, even for tiny prompts.
+
+```bash
+env -u CLAUDE_JOB_DIR claude --permission-mode bypassPermissions \
+  -p "Please run: env -u CLAUDE_JOB_DIR claude --bg --permission-mode bypassPermissions --name <name> -p \"<inner-prompt>\". Report the job ID."
+```
+
+Always instruct the dispatched agent to write files via Bash heredoc, or to call `EnterWorktree` first if it must use `Write`/`Edit`.
+
+Rationale: `env -u CLAUDE_JOB_DIR` alone restores live visibility only for small prompts and stalls on prompts ≥~1KB (round-20). The foreground `claude -p` intermediate reliably unblocks bg-inside-bg dispatches at any prompt size (round-21), so the size-conditional fork is collapsed into one mandated path.
+
+This is documentation-only today; `start-bg-build.sh` itself is unchanged. Apply the intermediate pattern manually whenever nesting any `claude --bg` invocation inside another bg job.
+
 ### Inputs
 
 - `RUN_ID`: exported for `claudex:build`.
